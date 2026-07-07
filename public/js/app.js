@@ -64,8 +64,8 @@ const btnCloseOutgoingModalFooter = document.getElementById('btn-close-outgoing-
 const btnCopyOutgoingJson = document.getElementById('btn-copy-outgoing-json');
 const outgoingJsonCode = document.getElementById('outgoing-json-code');
 
-// Auto AI Toggle
-const autoAiCheckbox = document.getElementById('auto-ai-checkbox');
+// Maintenance Toggle
+const maintenanceCheckbox = document.getElementById('maintenance-checkbox');
 const imageOnlyCheckbox = document.getElementById('image-only-checkbox');
 
 /* ==========================================================================
@@ -98,8 +98,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 2. Open real-time SSE stream
   connectSSE();
   
-  // 3. Load Auto AI toggle state
-  fetchAutoAIToggle();
+  // 3. Load Maintenance toggle state
+  fetchMaintenanceToggle();
   fetchImageOnlyToggle();
   
   // 4. Bind UI interactions
@@ -150,34 +150,37 @@ async function clearLogs() {
   }
 }
 
-// Fetch Auto AI toggle state from server
-async function fetchAutoAIToggle() {
+// Fetch Maintenance toggle state from server
+async function fetchMaintenanceToggle() {
   try {
     const res = await fetch('/api/auto-ai/toggle');
     if (!res.ok) throw new Error('Failed to fetch toggle');
     const data = await res.json();
     if (data.success) {
-      autoAiCheckbox.checked = !!data.enabled;
+      // Inverted logic: Maintenance is active (checked) if autoAiEnabled is false (not enabled)
+      maintenanceCheckbox.checked = !data.enabled;
     }
   } catch (error) {
-    console.error('Error fetching Auto AI toggle:', error);
+    console.error('Error fetching Maintenance toggle:', error);
   }
 }
 
-// Save Auto AI toggle state to server
-async function saveAutoAIToggle(enabled) {
+// Save Maintenance toggle state to server
+async function saveMaintenanceToggle(active) {
   try {
+    // Inverted logic: if Maintenance is checked (active=true), we set enabled to false
+    const enabled = !active;
     const res = await fetch('/api/auto-ai/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled })
     });
     if (!res.ok) throw new Error('Failed to save toggle');
-    console.log(`[Auto AI] Toggle ${enabled ? 'ON' : 'OFF'}`);
+    console.log(`[Maintenance] Mode set to ${active ? 'ON (Replies disabled)' : 'OFF (Replies enabled)'}`);
   } catch (error) {
-    console.error('Error saving Auto AI toggle:', error);
+    console.error('Error saving Maintenance toggle:', error);
     // Revert checkbox on failure
-    autoAiCheckbox.checked = !enabled;
+    maintenanceCheckbox.checked = !active;
   }
 }
 
@@ -689,9 +692,9 @@ function setupEventListeners() {
   searchInput.addEventListener('input', renderFeed);
   typeFilter.addEventListener('change', renderFeed);
 
-  // Auto AI Toggle
-  autoAiCheckbox.addEventListener('change', () => {
-    saveAutoAIToggle(autoAiCheckbox.checked);
+  // Maintenance Toggle
+  maintenanceCheckbox.addEventListener('change', () => {
+    saveMaintenanceToggle(maintenanceCheckbox.checked);
   });
   
   // Image Only Toggle

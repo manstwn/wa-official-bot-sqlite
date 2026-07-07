@@ -383,52 +383,53 @@ app.post(WEBHOOK_PATH, async (req, res) => {
           const cfg = await readAIConfig();
           const fromNumber = payload.from;
 
-          if (cfg.autoAiEnabled) {
-            if (payload.type === 'text') {
-              if (cfg.imageOnly) {
-                console.log(`[Auto AI] Text message received from +${fromNumber}, but Image Only toggle is enabled. Skipping.`);
-                return;
-              }
+          if (!cfg.autoAiEnabled) {
+            console.log(`[Auto AI] Maintenance mode is ON. Skipping response for +${fromNumber}.`);
+            return;
+          }
 
-              console.log(`[Auto AI] Processing text message from +${fromNumber} with ${cfg.provider}...`);
-              // Fetch history context (last 9 text messages)
-              const history = await getChatHistory(fromNumber, 9);
+          if (payload.type === 'text') {
+            if (cfg.imageOnly) {
+              console.log(`[Auto AI] Text message received from +${fromNumber}, but Image Only toggle is enabled. Skipping.`);
+              return;
+            }
+
+            console.log(`[Auto AI] Processing text message from +${fromNumber} with ${cfg.provider}...`);
+            // Fetch history context (last 9 text messages)
+            const history = await getChatHistory(fromNumber, 9);
+            try {
+              const aiReply = await callAIWithHistory(history, payload.body, cfg);
+              await sendWhatsAppReply(fromNumber, aiReply);
+            } catch (aiErr) {
+              console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
+              await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses pesan Anda.');
+            }
+          }
+
+          if (payload.type === 'image') {
+            // 1s delay then send template message
+            await new Promise(r => setTimeout(r, 1000));
+            await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
+
+            if (localPath) {
+              const fullPath = path.resolve('public' + localPath);
+              const imageBuffer = await fs.promises.readFile(fullPath);
+              const base64 = imageBuffer.toString('base64');
+              const ext = path.extname(localPath).toLowerCase();
+              const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+              const mimeType = mimeMap[ext] || 'image/jpeg';
+
+              console.log(`[Auto AI] Processing image from +${fromNumber} with ${cfg.provider}...`);
               try {
-                const aiReply = await callAIWithHistory(history, payload.body, cfg);
+                const aiReply = await callAIWithImage(base64, mimeType, cfg);
                 await sendWhatsAppReply(fromNumber, aiReply);
               } catch (aiErr) {
                 console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
-                await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses pesan Anda.');
+                await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
               }
+            } else {
+              await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
             }
-
-            if (payload.type === 'image') {
-              // 1s delay then send template message
-              await new Promise(r => setTimeout(r, 1000));
-              await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
-
-              if (localPath) {
-                const fullPath = path.resolve('public' + localPath);
-                const imageBuffer = await fs.promises.readFile(fullPath);
-                const base64 = imageBuffer.toString('base64');
-                const ext = path.extname(localPath).toLowerCase();
-                const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
-                const mimeType = mimeMap[ext] || 'image/jpeg';
-
-                console.log(`[Auto AI] Processing image from +${fromNumber} with ${cfg.provider}...`);
-                try {
-                  const aiReply = await callAIWithImage(base64, mimeType, cfg);
-                  await sendWhatsAppReply(fromNumber, aiReply);
-                } catch (aiErr) {
-                  console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
-                  await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
-                }
-              } else {
-                await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
-              }
-            }
-          } else {
-            await sendWhatsAppReply(fromNumber, 'Sistem sedang dalam perbaikan,silahkan cek kembali beberapa menit lagi');
           }
         } catch (err) {
           console.error('[Auto AI Background Error]', err);
