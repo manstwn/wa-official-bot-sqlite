@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Meta WA Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+  <div class="login-bg">
+    <div class="login-bg-glow login-bg-glow-1"></div>
+    <div class="login-bg-glow login-bg-glow-2"></div>
+    <div class="login-bg-glow login-bg-glow-3"></div>
+  </div>
+
+  <div class="login-container">
+    <div class="login-brand">
+      <div class="login-brand-icon">
+        <i data-lucide="message-square-code"></i>
+      </div>
+      <span class="login-brand-name">Meta WA Gateway</span>
+    </div>
+
+    <div class="login-card">
+      <p class="login-greeting">Welcome back</p>
+      <h1 class="login-title">Enter PIN to continue</h1>
+
+      <form id="login-form" class="login-form">
+        <div class="login-input-group">
+          <input type="password" id="pin-input" class="login-input" placeholder="Enter PIN" maxlength="10" autofocus />
+          <div class="login-input-line"></div>
+        </div>
+        <p class="login-error hidden" id="login-error">Incorrect PIN. Please try again.</p>
+        <button type="submit" id="login-btn" class="login-btn">
+          <span class="login-btn-text">Unlock Dashboard</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <p class="login-footer-text">Secured with PIN authentication</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    lucide.createIcons();
+
+    const form = document.getElementById('login-form');
+    const pinInput = document.getElementById('pin-input');
+    const loginBtn = document.getElementById('login-btn');
+    const loginBtnText = loginBtn.querySelector('.login-btn-text');
+    const loginError = document.getElementById('login-error');
+
+    function setBtnIcon(name) {
+      var el = loginBtn.querySelector('svg, i');
+      if (!el) {
+        loginBtn.innerHTML = '<span class="login-btn-text">' + loginBtnText.textContent + '</span><i data-lucide="' + name + '"></i>';
+        lucide.createIcons();
+      } else {
+        el.setAttribute('data-lucide', name);
+        lucide.createIcons();
+      }
+    }
+
+    const existingToken = sessionStorage.getItem('wa_token');
+    if (existingToken) {
+      fetch('/api/auth/check?token=' + encodeURIComponent(existingToken))
+        .then(function(r) { return r.json(); })
+        .then(function(data) { if (data.valid) window.location.href = '/'; })
+        .catch(function(){});
+    }
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var pin = pinInput.value.trim();
+      if (!pin) return;
+
+      loginBtn.disabled = true;
+      loginBtnText.textContent = 'Verifying...';
+      setBtnIcon('loader');
+      loginError.classList.add('hidden');
+
+      try {
+        var res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pin })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+          loginBtnText.textContent = 'Success!';
+          setBtnIcon('check-circle');
+          sessionStorage.setItem('wa_token', data.token);
+          setTimeout(function() { window.location.href = '/'; }, 400);
+        } else {
+          loginError.classList.remove('hidden');
+          pinInput.value = '';
+          pinInput.focus();
+          loginBtn.disabled = false;
+          loginBtnText.textContent = 'Unlock Dashboard';
+          setBtnIcon('arrow-right');
+        }
+      } catch (err) {
+        loginError.textContent = 'Connection error. Check server.';
+        loginError.classList.remove('hidden');
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Unlock Dashboard';
+        setBtnIcon('arrow-right');
+      }
+    });
+  </script>
+</body>
+</html>

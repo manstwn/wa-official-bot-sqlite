@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Prompt Tester — Meta WA Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/ai-tester.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-brand">
+        <a href="/" class="back-btn" title="Back to Dashboard" style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--border-color);background:rgba(255,255,255,0.03);color:var(--text-secondary);text-decoration:none;font-size:0.8rem;font-weight:500;transition:var(--transition-smooth);cursor:pointer;">
+          <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Dashboard
+        </a>
+        <div class="logo-icon">
+          <i data-lucide="bot"></i>
+        </div>
+        <div class="brand-text">
+          <h1>AI Prompt Tester</h1>
+          <p>Test Gemini &amp; OpenRouter with text &amp; images</p>
+        </div>
+      </div>
+      <div class="action-buttons">
+        <span class="header-badge">
+          <i data-lucide="flask-conical" style="width:12px;height:12px;"></i> Debug Mode
+        </span>
+      </div>
+    </header>
+
+    <main class="app-workspace" style="display:grid;grid-template-columns:420px 1fr;gap:0;">
+      <!-- LEFT: Config Panel -->
+      <section class="panel" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="panel-header">
+          <div class="panel-title-container">
+            <i data-lucide="sliders"></i>
+            <h2>Configuration</h2>
+          </div>
+        </div>
+        <div class="config-scroll">
+          <!-- Provider & Model + System Prompt -->
+          <div class="config-section">
+            <div class="config-section-title">
+              <i data-lucide="cpu"></i> Provider &amp; Model
+              <span class="save-status" id="save-status"></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">AI Provider</label>
+              <div class="provider-tabs">
+                <button class="provider-tab active" data-provider="gemini" id="tab-gemini"><i data-lucide="zap"></i> Gemini</button>
+                <button class="provider-tab" data-provider="openrouter" id="tab-openrouter"><i data-lucide="route"></i> OpenRouter</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="model-input"><i data-lucide="layers"></i> Model Name</label>
+              <input type="text" class="form-input" id="model-input" placeholder="e.g. gemini-2.0-flash-lite" value="gemini-2.0-flash-lite">
+              <span class="form-hint" id="model-hint">Gemini model ID. Switch to OpenRouter for cross-provider models.</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="gemini-key-input"><i data-lucide="key-round"></i> Gemini API Key</label>
+              <input type="password" class="form-input" id="gemini-key-input" placeholder="AIza...">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="openrouter-key-input"><i data-lucide="key-round"></i> OpenRouter API Key</label>
+              <input type="password" class="form-input" id="openrouter-key-input" placeholder="sk-or-...">
+            </div>
+            <div class="form-group config-divider">
+              <label class="form-label" for="system-prompt-input"><i data-lucide="scroll-text"></i> System Prompt</label>
+              <textarea class="form-textarea" id="system-prompt-input" rows="8" placeholder="Write your system prompt...">Anda adalah asisten kesehatan diabetes profesional. Analisis gambar makanan atau jawab pertanyaan pengguna dengan gaya bahasa yang santai namun tetap informatif.
+
+ATURAN FORMATTING WHATSAPP:
+1. Gunakan satu bintang di awal dan akhir kata (*teks*) untuk menebalkan poin penting.
+2. JANGAN gunakan bullet points markdown (seperti * atau - yang menjorok).
+3. Gunakan list manual dengan angka (1, 2, 3) atau strip manual (-) tanpa spasi menjorok.
+4. Berikan jarak (double enter) antar bagian agar mudah dibaca.
+5. Jarak (double enter) antar bagian.
+6. Hindari penjelasan yang terlalu panjang, fokus pada poin-poin inti.
+
+FORMAT ANALISIS MAKANAN:
+*Nama Makanan:* [nama makanan]
+
+*Estimasi Gizi (perkiraan per porsi):*
+1. Karbohidrat: xx g
+2. Gula: xx g
+3. Kalori: xx kcal
+
+*Status untuk Diabetes:*
+[Analisis singkat keamanan jangan terlalu panjang]
+
+*Saran:*
+[Saran singkat konsumsi jangan terlalu panjang]</textarea>
+              <span class="char-count" id="sys-prompt-chars">0 chars</span>
+            </div>
+            <button class="save-config-btn" id="save-config-btn" type="button">
+              <i data-lucide="save"></i> Save Config
+            </button>
+          </div>
+
+          <!-- User Message -->
+          <div class="config-section">
+            <div class="config-section-title"><i data-lucide="message-circle"></i> User Message</div>
+            <div class="form-group">
+              <textarea class="form-textarea" id="user-message-input" rows="3" placeholder="Type a user message, or leave blank if sending only an image..."></textarea>
+              <span class="char-count" id="user-msg-chars">0 chars</span>
+            </div>
+          </div>
+
+          <!-- Image -->
+          <div class="config-section">
+            <div class="config-section-title"><i data-lucide="image-plus"></i> Image <span class="form-hint" style="font-weight:400;text-transform:none;letter-spacing:0;" id="image-info-label"></span></div>
+            <div class="image-upload-zone" id="image-upload-zone">
+              <input type="file" id="image-file-input" accept="image/jpeg,image/png,image/webp,image/gif">
+              <div class="upload-placeholder">
+                <i data-lucide="upload-cloud"></i>
+                <p><strong>Click or drag</strong> to attach an image<br>JPG, PNG, WEBP, GIF — max 10MB</p>
+              </div>
+              <img id="image-preview-thumb" src="" alt="Attached image">
+              <button class="image-clear-btn" id="image-clear-btn" type="button"><i data-lucide="x"></i></button>
+            </div>
+          </div>
+
+          <button class="run-btn" id="run-btn" type="button">
+            <span class="btn-icon"><i data-lucide="send"></i></span>
+            <div class="spinner"></div>
+            <span class="btn-text"></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- RIGHT: Output Panel -->
+      <section class="panel" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="panel-title-container">
+            <i data-lucide="sparkles"></i>
+            <h2>AI Response</h2>
+          </div>
+          <div class="output-meta">
+            <div class="meta-chip hidden" id="chip-provider"><i data-lucide="cpu"></i><span id="chip-provider-text">—</span></div>
+            <div class="meta-chip hidden" id="chip-model"><i data-lucide="layers"></i><span id="chip-model-text">—</span></div>
+            <div class="meta-chip hidden" id="chip-elapsed"><i data-lucide="timer"></i><span id="chip-elapsed-text">—</span></div>
+            <button class="copy-btn-sm hidden" id="btn-copy-response"><i data-lucide="copy"></i> Copy</button>
+          </div>
+        </div>
+
+        <div class="output-tabs">
+          <button class="out-tab-btn active" data-pane="response"><i data-lucide="message-square"></i> Response</button>
+          <button class="out-tab-btn" data-pane="raw"><i data-lucide="code-2"></i> Raw JSON</button>
+          <button class="out-tab-btn" data-pane="request"><i data-lucide="arrow-up-right"></i> Request</button>
+          <button class="out-tab-btn" data-pane="history"><i data-lucide="history"></i> History</button>
+        </div>
+
+        <div class="output-body">
+          <div class="out-pane active" id="pane-response">
+            <div class="idle-state" id="idle-state">
+              <div class="idle-orb"><i data-lucide="bot"></i></div>
+              <h3>Ready to test</h3>
+              <p>Configure your provider, model, and prompt on the left, then hit <strong>Send to AI</strong>.</p>
+            </div>
+            <div class="loading-state" id="loading-state">
+              <div class="loading-spinner-ring"></div>
+              <p>Waiting for <strong id="loading-provider-label">AI</strong> response…</p>
+            </div>
+            <div class="error-card" id="error-card">
+              <div class="error-card-header"><i data-lucide="circle-x"></i><span id="error-title">Request Failed</span></div>
+              <p id="error-message">Something went wrong.</p>
+              <span class="error-raw-toggle" id="error-raw-toggle">Show raw response</span>
+              <pre class="error-raw-pre" id="error-raw-pre"></pre>
+            </div>
+            <div class="response-bubble" id="response-bubble">
+              <div class="response-header">
+                <div class="ai-avatar"><i data-lucide="bot"></i></div>
+                <div class="response-meta-info">
+                  <strong id="response-provider-label">AI</strong>
+                  <span id="response-time-label">just now</span>
+                </div>
+              </div>
+              <div class="response-text-card" id="response-text-content"></div>
+            </div>
+          </div>
+
+          <div class="out-pane" id="pane-raw">
+            <pre class="debug-json-block" id="raw-json-content">// No response yet. Run a test first.</pre>
+          </div>
+
+          <div class="out-pane" id="pane-request">
+            <div id="request-debug-content">
+              <p style="color:var(--text-muted);font-size:0.8rem;">No request sent yet.</p>
+            </div>
+          </div>
+
+          <div class="out-pane" id="pane-history">
+            <div class="history-list" id="history-list">
+              <div class="history-empty">No requests in this session yet.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/ai-tester.js"></script>
+</body>
+</html>

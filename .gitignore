@@ -1,0 +1,59 @@
+# ========================
+# Dependencies
+# ========================
+node_modules/
+package-lock.json
+
+# ========================
+# Environment & Credentials
+# ========================
+.env
+.env.local
+.env.*.local
+
+# ========================
+# Runtime Data & AI Keys
+# All JSON data (db, ai-config w/ keys, ai-history) live here
+# ========================
+data/
+
+# ========================
+# Uploaded Media Files
+# ========================
+public/uploads/
+
+# ========================
+# Logs
+# ========================
+*.log
+npm-debug.log*
+logs/
+
+# ========================
+# Internal Project Docs
+# (contain system info, URLs, endpoint details)
+# ========================
+PROJECT_KNOWLEDGE.md
+WEBHOOK_DOCS.md
+implementation_plan.md
+walkthrough.md
+task.md
+
+# ========================
+# OS & Editor Junk
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ========================
+# Misc
+# ========================
+*.tmp
+*.bak

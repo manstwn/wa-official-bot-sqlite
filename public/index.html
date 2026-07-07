@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Bot Webhook Gateway Tester</title>
+  <!-- Google Fonts: Space Grotesk & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/style.css?v=1.1">
+  <!-- Lucide Icons (CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon">
+          <i data-lucide="message-square-code"></i>
+        </div>
+        <div class="brand-text">
+          <h1>Meta WA Gateway</h1>
+          <p>Real-time Webhook Receiver & Inspect System</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <!-- Live Connection Status -->
+        <div id="conn-status" class="status-badge disconnected">
+          <span class="status-dot"></span>
+          <span class="status-text">Disconnected</span>
+        </div>
+
+        <!-- Total Messages Counter -->
+        <div class="stat-badge">
+          <i data-lucide="database"></i>
+          <span class="stat-label">Stored:</span>
+          <span id="stored-count" class="stat-value">0</span>
+        </div>
+
+        <!-- Auto AI Toggle -->
+        <div class="auto-ai-toggle">
+          <span class="toggle-label">Auto AI</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="auto-ai-checkbox">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="action-buttons">
+          <a href="/ai-tester.html" class="btn btn-secondary" title="Open AI Prompt Tester" style="text-decoration:none;display:flex;align-items:center;gap:6px;">
+            <i data-lucide="bot"></i> AI Tester
+          </a>
+
+          <button id="btn-ai-config" class="btn btn-secondary" title="AI Configuration">
+            <i data-lucide="settings-2"></i> AI Config
+          </button>
+
+          <a id="btn-landing" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" title="Buka Landing Page" style="text-decoration:none;display:none;align-items:center;gap:6px;">
+            <i data-lucide="globe"></i> Landing Page
+          </a>
+
+          <button id="btn-clear" class="btn btn-danger" title="Clear all stored webhook records">
+            <i data-lucide="trash-2"></i> Clear Logs
+          </button>
+          <button id="btn-logout" class="btn btn-secondary" title="Lock dashboard and return to login">
+            <i data-lucide="log-out"></i> Logout
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="app-workspace">
+      <!-- Left Panel: Message List Feed -->
+      <section class="panel panel-feed">
+        <div class="panel-header">
+          <div class="panel-title-container">
+            <i data-lucide="activity"></i>
+            <h2>Live Payload Stream</h2>
+          </div>
+          <div class="filter-bar" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+            <input type="text" id="search-input" placeholder="Search..." style="flex: 1;" />
+            <button id="btn-toggle-group" class="btn btn-secondary btn-icon-only" title="Group by Phone Number" style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); color: var(--text-muted); cursor: pointer; transition: var(--transition-smooth); padding: 0; flex-shrink: 0;">
+              <i data-lucide="users" style="width: 16px; height: 16px;"></i>
+            </button>
+            <select id="type-filter" style="width: auto; max-width: 110px;">
+              <option value="all">All</option>
+              <option value="text">Text</option>
+              <option value="image">Image</option>
+              <option value="audio">Audio</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="feed-scroll-container" id="feed-container">
+          <!-- Empty State -->
+          <div class="feed-empty-state" id="feed-empty">
+            <div class="empty-icon">
+              <i data-lucide="inbox"></i>
+            </div>
+            <h3>No payloads received yet</h3>
+            <p>Trigger a WhatsApp message to populate the stream.</p>
+          </div>
+          <!-- Feed items will be injected here -->
+        </div>
+      </section>
+
+      <!-- Right Panel: Message Details & Chat Console (Tabbed) -->
+      <section class="panel panel-detail" id="detail-panel">
+        <!-- Default State: No Selection -->
+        <div class="detail-empty-state" id="detail-empty">
+          <div class="pulse-ring">
+            <i data-lucide="info" class="pulse-icon"></i>
+          </div>
+          <h3>Select a Message</h3>
+          <p>Click on any incoming webhook in the feed to inspect details and view the chat conversation.</p>
+        </div>
+
+        <!-- Detail/Chat Content (hidden by default) -->
+        <div class="detail-content hidden" id="detail-content">
+          <!-- Tabs Switcher Header -->
+          <div class="panel-tabs">
+            <button class="tab-btn active" id="tab-btn-chat" data-tab="chat">
+              <i data-lucide="message-square"></i> Chat View
+            </button>
+            <button class="tab-btn" id="tab-btn-debug" data-tab="debug">
+              <i data-lucide="terminal"></i> Debug Inspector
+            </button>
+          </div>
+
+          <!-- TAB 1: Chat View -->
+          <div class="tab-pane active" id="tab-pane-chat">
+            <!-- Chat Header -->
+            <div class="chat-header">
+              <div class="chat-header-user">
+                <div class="chat-avatar">
+                  <i data-lucide="user"></i>
+                </div>
+                <div class="chat-header-meta">
+                  <h3 class="chat-contact-title" id="detail-sender-chat">+62 896-4318-0966</h3>
+                  <span class="chat-status"><span class="status-dot-active"></span> Inbound Session</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chat Message Thread -->
+            <div class="chat-messages-container" id="chat-messages-container">
+              <!-- Render bubbles here -->
+            </div>
+
+            <!-- Chat Reply Footer -->
+            <div class="chat-footer" id="chat-footer">
+              <div class="reply-lock-banner hidden" id="reply-lock-banner">
+                <i data-lucide="clock"></i>
+                <span>Reply locked — last message from contact was over 12 hours ago</span>
+              </div>
+              <div class="reply-lock-indicator" id="reply-lock-indicator">
+                <i data-lucide="lock-open"></i>
+              </div>
+              <form id="chat-reply-form" class="chat-form">
+                <input type="text" id="chat-reply-input" placeholder="Type a reply..." autocomplete="off" />
+                <div class="chat-footer-actions">
+                  <button type="button" id="btn-debug-post" class="btn btn-secondary btn-sm" title="Show outgoing POST request payload">
+                    <i data-lucide="code"></i> Inspect Outgoing POST
+                  </button>
+                  <button type="submit" id="btn-send-reply" class="chat-send-btn" title="Send Reply">
+                    <i data-lucide="send"></i>
+                    <span class="send-btn-time" id="reply-time-left"></span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- TAB 2: Debug Inspector (Original View) -->
+          <div class="tab-pane" id="tab-pane-debug">
+            <div class="debug-pane-scrollable">
+              <!-- Card Header -->
+              <div class="detail-section detail-meta-header">
+                <div class="meta-row">
+                  <span class="detail-type-badge text" id="detail-type-badge">TEXT</span>
+                  <span class="detail-timestamp" id="detail-time">Jul 2, 2026 19:47</span>
+                </div>
+                <h3 id="detail-sender">+62 896-4318-0966</h3>
+                <div class="id-row">
+                  <span class="label">ID:</span>
+                  <code id="detail-msg-id" class="msg-id-code">wamid.HBgNNjI4OTY0MzE4MDk2...</code>
+                  <button class="copy-btn" id="btn-copy-id" title="Copy ID">
+                    <i data-lucide="copy"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Body Card -->
+              <div class="detail-section">
+                <h4 class="section-label">Message Body / Caption</h4>
+                <div class="body-content-card" id="detail-body-card">
+                  <p id="detail-body-text">No content text.</p>
+                </div>
+              </div>
+
+              <!-- Media Download Section -->
+              <div class="detail-section hidden" id="detail-media-section">
+                <h4 class="section-label">Media & Temporary Download Link</h4>
+                
+                <!-- Image Preview Box -->
+                <div class="image-preview-container hidden" id="detail-image-preview-box">
+                  <img id="detail-image-preview" src="" alt="WhatsApp Media Preview" />
+                </div>
+
+                <!-- Temporary Access Link Details -->
+                <div class="temp-url-card">
+                  <div class="temp-url-header">
+                    <div class="lock-indicator">
+                      <i data-lucide="shield-check" class="shield-icon"></i>
+                      <span>Signed Gateway Media Access</span>
+                    </div>
+                    <div class="countdown-badge" id="countdown-badge">
+                      <i data-lucide="clock"></i>
+                      <span id="countdown-timer">00:00</span>
+                    </div>
+                  </div>
+                  <p class="temp-url-info">
+                    This URL is cryptographically signed by the webhook gateway. It expires in 10 minutes.
+                  </p>
+                  <div class="url-input-group">
+                    <input type="text" id="detail-temp-url" readonly />
+                    <a id="detail-download-link" href="#" target="_blank" class="btn btn-primary btn-sm">
+                      <i data-lucide="external-link"></i> Open
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- JSON Payload Inspector -->
+              <div class="detail-section detail-json-section">
+                <div class="section-header-row">
+                  <h4 class="section-label">Raw Gateway Webhook JSON</h4>
+                  <button id="btn-copy-json" class="btn btn-secondary btn-xs">
+                    <i data-lucide="copy"></i> Copy JSON
+                  </button>
+                </div>
+                <pre class="json-code-block"><code id="detail-json-code">{}</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+  <!-- Simulated Outgoing API Payload Modal -->
+  <div class="modal" id="outgoing-debug-modal">
+    <div class="modal-overlay" id="btn-close-outgoing-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Meta WhatsApp API Outbound Payload</h3>
+        <button class="modal-close" id="btn-close-outgoing-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc text-muted" style="margin-bottom: 16px;">
+          Below is the HTTP POST request payload that your bot receiver will send to the Meta Graph API to dispatch this reply message.
+        </p>
+        <div class="http-debug-block" style="border: 1px solid var(--border-color); border-radius: 12px; background: rgba(0,0,0,0.25); overflow: hidden;">
+          <div class="http-header-block" style="padding: 12px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+            <span class="http-method" style="background: #22c55e; color: black; font-weight: 700; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px;">POST</span> 
+            <span class="http-url" style="font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);" id="outgoing-meta-url">/v25.0/{PHONE_NUMBER_ID}/messages</span>
+          </div>
+          <pre class="http-headers-code" style="margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.1);"><code style="font-family: monospace;">Host: graph.facebook.com
+Authorization: Bearer EAAa...[WHATSAPP_TOKEN]
+Content-Type: application/json</code></pre>
+          <pre class="json-code-block" style="margin: 0; max-height: 250px; overflow-y: auto; padding: 16px;"><code id="outgoing-json-code">{}</code></pre>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+        <button id="btn-copy-outgoing-json" class="btn btn-secondary"><i data-lucide="copy"></i> Copy Payload</button>
+        <button id="btn-close-outgoing-modal-footer" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Config Modal -->
+  <div class="modal" id="ai-config-modal">
+    <div class="modal-overlay" id="ai-config-modal-overlay"></div>
+    <div class="modal-content" style="max-width:520px;width:90%;max-height:88vh;display:flex;flex-direction:column;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <i data-lucide="settings-2" style="width:16px;height:16px;color:var(--color-brand);"></i>
+          <h3 style="font-size:0.95rem;">AI Configuration</h3>
+        </div>
+        <button class="modal-close" id="btn-close-ai-config"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Provider & Model -->
+        <div class="ai-cfg-section">
+          <div class="ai-cfg-section-title"><i data-lucide="cpu"></i> Provider &amp; Model
+            <span class="ai-cfg-save-status" id="cfg-save-status"></span>
+          </div>
+          <div class="ai-cfg-form-group">
+            <label class="ai-cfg-label">AI Provider</label>
+            <div class="ai-cfg-provider-tabs">
+              <button class="ai-cfg-tab active" data-prov="gemini" id="cfg-tab-gemini"><i data-lucide="zap"></i> Gemini</button>
+              <button class="ai-cfg-tab" data-prov="openrouter" id="cfg-tab-openrouter"><i data-lucide="route"></i> OpenRouter</button>
+            </div>
+          </div>
+          <div class="ai-cfg-form-group">
+            <label class="ai-cfg-label" for="cfg-model"><i data-lucide="layers"></i> Model Name</label>
+            <input type="text" class="ai-cfg-input" id="cfg-model" placeholder="e.g. gemini-2.0-flash-lite">
+            <span class="ai-cfg-hint" id="cfg-model-hint">Gemini model ID.</span>
+          </div>
+          <div class="ai-cfg-form-group">
+            <label class="ai-cfg-label" for="cfg-gemini-key"><i data-lucide="key-round"></i> Gemini API Key</label>
+            <input type="password" class="ai-cfg-input" id="cfg-gemini-key" placeholder="AIza...">
+          </div>
+          <div class="ai-cfg-form-group">
+            <label class="ai-cfg-label" for="cfg-or-key"><i data-lucide="key-round"></i> OpenRouter API Key</label>
+            <input type="password" class="ai-cfg-input" id="cfg-or-key" placeholder="sk-or-...">
+          </div>
+        </div>
+
+        <!-- System Prompt -->
+        <div class="ai-cfg-section">
+          <div class="ai-cfg-section-title"><i data-lucide="scroll-text"></i> System Prompt</div>
+          <div class="ai-cfg-form-group">
+            <textarea class="ai-cfg-input" id="cfg-system-prompt" rows="9" placeholder="Write your system prompt..."></textarea>
+            <span class="ai-cfg-hint" id="cfg-chars">0 chars</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding:16px 20px;border-top:1px solid var(--border-color);display:flex;justify-content:flex-end;gap:10px;">
+        <button id="btn-ai-config-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="btn-ai-config-save" class="btn btn-primary"><i data-lucide="save"></i> Save Config</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
