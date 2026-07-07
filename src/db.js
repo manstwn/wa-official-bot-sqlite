@@ -40,7 +40,8 @@ db.exec(`
     geminiKey TEXT DEFAULT '',
     openrouterKey TEXT DEFAULT '',
     systemPrompt TEXT DEFAULT '',
-    autoAiEnabled INTEGER DEFAULT 0 -- 0 = false, 1 = true
+    autoAiEnabled INTEGER DEFAULT 0, -- 0 = false, 1 = true
+    imageOnly INTEGER DEFAULT 0 -- 0 = false, 1 = true
   );
 
   CREATE TABLE IF NOT EXISTS ai_history (
@@ -48,6 +49,13 @@ db.exec(`
     entry TEXT NOT NULL -- JSON string
   );
 `);
+
+// Add new columns to existing schema if necessary
+try {
+  db.exec(`ALTER TABLE ai_config ADD COLUMN imageOnly INTEGER DEFAULT 0`);
+} catch (e) {
+  // Ignored if column already exists
+}
 
 // ============================================================
 // Automatic Startup Migration from legacy JSON files
@@ -70,7 +78,8 @@ function runLegacyMigrations() {
     geminiKey: '',
     openrouterKey: '',
     systemPrompt: '',
-    autoAiEnabled: 0
+    autoAiEnabled: 0,
+    imageOnly: 0
   };
 
   if (configExists) {
@@ -83,7 +92,8 @@ function runLegacyMigrations() {
         geminiKey: parsed.geminiKey || '',
         openrouterKey: parsed.openrouterKey || '',
         systemPrompt: parsed.systemPrompt || '',
-        autoAiEnabled: parsed.autoAiEnabled ? 1 : 0
+        autoAiEnabled: parsed.autoAiEnabled ? 1 : 0,
+        imageOnly: parsed.imageOnly ? 1 : 0
       };
       console.log('[SQLite Migration] Loaded existing configuration from JSON.');
     } catch (err) {
@@ -93,15 +103,16 @@ function runLegacyMigrations() {
 
   // Ensure config row exists
   db.prepare(`
-    INSERT OR IGNORE INTO ai_config (id, provider, model, geminiKey, openrouterKey, systemPrompt, autoAiEnabled)
-    VALUES (1, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO ai_config (id, provider, model, geminiKey, openrouterKey, systemPrompt, autoAiEnabled, imageOnly)
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     initialConfig.provider,
     initialConfig.model,
     initialConfig.geminiKey,
     initialConfig.openrouterKey,
     initialConfig.systemPrompt,
-    initialConfig.autoAiEnabled
+    initialConfig.autoAiEnabled,
+    initialConfig.imageOnly
   );
 
   if (configExists) {
@@ -299,7 +310,8 @@ export async function readAIConfig() {
         geminiKey: '',
         openrouterKey: '',
         systemPrompt: '',
-        autoAiEnabled: false
+        autoAiEnabled: false,
+        imageOnly: false
       };
     }
     return {
@@ -308,7 +320,8 @@ export async function readAIConfig() {
       geminiKey: row.geminiKey,
       openrouterKey: row.openrouterKey,
       systemPrompt: row.systemPrompt,
-      autoAiEnabled: row.autoAiEnabled === 1
+      autoAiEnabled: row.autoAiEnabled === 1,
+      imageOnly: row.imageOnly === 1
     };
   } catch (error) {
     console.error('Error reading AI config from SQLite:', error);
@@ -318,7 +331,8 @@ export async function readAIConfig() {
       geminiKey: '',
       openrouterKey: '',
       systemPrompt: '',
-      autoAiEnabled: false
+      autoAiEnabled: false,
+      imageOnly: false
     };
   }
 }
@@ -332,22 +346,24 @@ export async function writeAIConfig(cfg) {
     const merged = { ...current, ...cfg };
 
     db.prepare(`
-      INSERT INTO ai_config (id, provider, model, geminiKey, openrouterKey, systemPrompt, autoAiEnabled)
-      VALUES (1, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ai_config (id, provider, model, geminiKey, openrouterKey, systemPrompt, autoAiEnabled, imageOnly)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         provider = excluded.provider,
         model = excluded.model,
         geminiKey = excluded.geminiKey,
         openrouterKey = excluded.openrouterKey,
         systemPrompt = excluded.systemPrompt,
-        autoAiEnabled = excluded.autoAiEnabled
+        autoAiEnabled = excluded.autoAiEnabled,
+        imageOnly = excluded.imageOnly
     `).run(
       merged.provider,
       merged.model,
       merged.geminiKey,
       merged.openrouterKey,
       merged.systemPrompt,
-      merged.autoAiEnabled ? 1 : 0
+      merged.autoAiEnabled ? 1 : 0,
+      merged.imageOnly ? 1 : 0
     );
 
     return merged;
@@ -399,5 +415,29 @@ export async function deleteAIHistoryEntry(time) {
   } catch (error) {
     console.error('Error deleting AI history entry from SQLite:', error);
     throw error;
+  }
+}
+
+/**
+ * Fetch last N text messages for a contact, sorted chronologically.
+ */
+export async function getChatHistory(phoneNumber, limit = 9) {
+  try {
+    const rows = db.prepare(`
+      SELECT * FROM messages 
+      WHERE ([from] = ? OR [to] = ?) 
+        AND type = 'text'
+        AND body IS NOT NULL AND body <> ''
+      ORDER BY ingestedAt DESC 
+      LIMIT ?
+    `).all(phoneNumber, phoneNumber, limit);
+    return rows.reverse().map(row => ({
+      ...row,
+      metaResponse: row.metaResponse ? JSON.parse(row.metaResponse) : null,
+      rawData: row.rawData ? JSON.parse(row.rawData) : null
+    }));
+  } catch (error) {
+    console.error('Error fetching chat history from SQLite:', error);
+    return [];
   }
 }

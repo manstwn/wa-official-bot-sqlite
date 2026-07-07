@@ -12,7 +12,8 @@ import {
   writeAIConfig,
   readAIHistory,
   writeAIHistory,
-  deleteAIHistoryEntry
+  deleteAIHistoryEntry,
+  getChatHistory
 } from './db.js';
 
 dotenv.config();
@@ -200,6 +201,96 @@ async function callAIWithImage(imageBase64, mimeType, aiConfig) {
 }
 
 // ============================================================
+// Helper: Process chat history + user message with AI
+// ============================================================
+async function callAIWithHistory(history, userMessage, aiConfig) {
+  const provider = aiConfig.provider || 'gemini';
+  const model = aiConfig.model || (provider === 'gemini' ? 'gemini-2.0-flash-lite' : 'google/gemini-2.0-flash-lite-001');
+  const apiKey = provider === 'openrouter' ? aiConfig.openrouterKey : aiConfig.geminiKey;
+
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error(`No API key configured for ${provider}`);
+  }
+
+  let responseText = '';
+
+  if (provider === 'gemini') {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    // Map history to Gemini contents format
+    // Inbound = user, Outbound (system/outbound) = model
+    const contents = history.map(msg => ({
+      role: msg.direction === 'inbound' ? 'user' : 'model',
+      parts: [{ text: msg.body }]
+    }));
+    
+    // Append current user message
+    contents.push({
+      role: 'user',
+      parts: [{ text: userMessage }]
+    });
+
+    const geminiBody = { contents };
+    if (aiConfig.systemPrompt) {
+      geminiBody.system_instruction = { parts: [{ text: aiConfig.systemPrompt }] };
+    }
+
+    console.log(`[Auto AI] Dispatching text history request to Gemini API. Model: ${model}, History size: ${history.length}`);
+    const geminiRes = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geminiBody)
+    });
+    
+    const geminiData = await geminiRes.json();
+    if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Gemini API error');
+    responseText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
+  } else if (provider === 'openrouter') {
+    const apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    
+    const messages = [];
+    if (aiConfig.systemPrompt) {
+      messages.push({ role: 'system', content: aiConfig.systemPrompt });
+    }
+    
+    // Map history to OpenRouter messages format
+    // Inbound = user, Outbound (system/outbound) = assistant
+    history.forEach(msg => {
+      messages.push({
+        role: msg.direction === 'inbound' ? 'user' : 'assistant',
+        content: msg.body
+      });
+    });
+    
+    // Append current user message
+    messages.push({
+      role: 'user',
+      content: userMessage
+    });
+
+    console.log(`[Auto AI] Dispatching text history request to OpenRouter API. Model: ${model}, History size: ${history.length}`);
+    const orRes = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'WA Bot Auto AI'
+      },
+      body: JSON.stringify({ model, messages })
+    });
+
+    const orData = await orRes.json();
+    if (!orRes.ok) throw new Error(orData?.error?.message || 'OpenRouter API error');
+    responseText = orData?.choices?.[0]?.message?.content || '(No response)';
+  } else {
+    throw new Error(`Unknown provider: ${provider}`);
+  }
+
+  return responseText;
+}
+
+// ============================================================
 // Toggle API: Auto AI reply for images
 // ============================================================
 app.get('/api/auto-ai/toggle', async (req, res) => {
@@ -219,6 +310,31 @@ app.post('/api/auto-ai/toggle', async (req, res) => {
     await writeAIConfig(cfg);
     console.log(`[Auto AI] Toggle set to ${cfg.autoAiEnabled ? 'ON' : 'OFF'}`);
     return res.json({ success: true, enabled: cfg.autoAiEnabled });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+// Toggle API: Auto AI Image Only mode
+// ============================================================
+app.get('/api/auto-ai/image-only', async (req, res) => {
+  try {
+    const cfg = await readAIConfig();
+    return res.json({ success: true, imageOnly: !!cfg.imageOnly });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auto-ai/image-only', async (req, res) => {
+  try {
+    const { imageOnly } = req.body;
+    const cfg = await readAIConfig();
+    cfg.imageOnly = !!imageOnly;
+    await writeAIConfig(cfg);
+    console.log(`[Auto AI] Image Only set to ${cfg.imageOnly ? 'ON' : 'OFF'}`);
+    return res.json({ success: true, imageOnly: cfg.imageOnly });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -261,35 +377,55 @@ app.post(WEBHOOK_PATH, async (req, res) => {
     });
 
     // AI processing (async)
-    if (payload.type === 'image') {
+    if (payload.type === 'image' || payload.type === 'text') {
       (async () => {
         try {
           const cfg = await readAIConfig();
           const fromNumber = payload.from;
 
           if (cfg.autoAiEnabled) {
-            // 1s delay then send template message
-            await new Promise(r => setTimeout(r, 1000));
-            await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
+            if (payload.type === 'text') {
+              if (cfg.imageOnly) {
+                console.log(`[Auto AI] Text message received from +${fromNumber}, but Image Only toggle is enabled. Skipping.`);
+                return;
+              }
 
-            if (localPath) {
-              const fullPath = path.resolve('public' + localPath);
-              const imageBuffer = await fs.promises.readFile(fullPath);
-              const base64 = imageBuffer.toString('base64');
-              const ext = path.extname(localPath).toLowerCase();
-              const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
-              const mimeType = mimeMap[ext] || 'image/jpeg';
-
-              console.log(`[Auto AI] Processing image from +${fromNumber} with ${cfg.provider}...`);
+              console.log(`[Auto AI] Processing text message from +${fromNumber} with ${cfg.provider}...`);
+              // Fetch history context (last 9 text messages)
+              const history = await getChatHistory(fromNumber, 9);
               try {
-                const aiReply = await callAIWithImage(base64, mimeType, cfg);
+                const aiReply = await callAIWithHistory(history, payload.body, cfg);
                 await sendWhatsAppReply(fromNumber, aiReply);
               } catch (aiErr) {
                 console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
-                await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
+                await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses pesan Anda.');
               }
-            } else {
-              await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
+            }
+
+            if (payload.type === 'image') {
+              // 1s delay then send template message
+              await new Promise(r => setTimeout(r, 1000));
+              await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
+
+              if (localPath) {
+                const fullPath = path.resolve('public' + localPath);
+                const imageBuffer = await fs.promises.readFile(fullPath);
+                const base64 = imageBuffer.toString('base64');
+                const ext = path.extname(localPath).toLowerCase();
+                const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+                const mimeType = mimeMap[ext] || 'image/jpeg';
+
+                console.log(`[Auto AI] Processing image from +${fromNumber} with ${cfg.provider}...`);
+                try {
+                  const aiReply = await callAIWithImage(base64, mimeType, cfg);
+                  await sendWhatsAppReply(fromNumber, aiReply);
+                } catch (aiErr) {
+                  console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
+                  await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
+                }
+              } else {
+                await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
+              }
             }
           } else {
             await sendWhatsAppReply(fromNumber, 'Sistem sedang dalam perbaikan,silahkan cek kembali beberapa menit lagi');

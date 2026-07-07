@@ -66,6 +66,7 @@ const outgoingJsonCode = document.getElementById('outgoing-json-code');
 
 // Auto AI Toggle
 const autoAiCheckbox = document.getElementById('auto-ai-checkbox');
+const imageOnlyCheckbox = document.getElementById('image-only-checkbox');
 
 /* ==========================================================================
    INITIALIZATION & API CALLS
@@ -99,6 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 3. Load Auto AI toggle state
   fetchAutoAIToggle();
+  fetchImageOnlyToggle();
   
   // 4. Bind UI interactions
   setupEventListeners();
@@ -176,6 +178,37 @@ async function saveAutoAIToggle(enabled) {
     console.error('Error saving Auto AI toggle:', error);
     // Revert checkbox on failure
     autoAiCheckbox.checked = !enabled;
+  }
+}
+
+// Fetch Image Only toggle state from server
+async function fetchImageOnlyToggle() {
+  try {
+    const res = await fetch('/api/auto-ai/image-only');
+    if (!res.ok) throw new Error('Failed to fetch toggle');
+    const data = await res.json();
+    if (data.success) {
+      imageOnlyCheckbox.checked = !!data.imageOnly;
+    }
+  } catch (error) {
+    console.error('Error fetching Image Only toggle:', error);
+  }
+}
+
+// Save Image Only toggle state to server
+async function saveImageOnlyToggle(imageOnly) {
+  try {
+    const res = await fetch('/api/auto-ai/image-only', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageOnly })
+    });
+    if (!res.ok) throw new Error('Failed to save toggle');
+    console.log(`[Auto AI] Image Only ${imageOnly ? 'ON' : 'OFF'}`);
+  } catch (error) {
+    console.error('Error saving Image Only toggle:', error);
+    // Revert checkbox on failure
+    imageOnlyCheckbox.checked = !imageOnly;
   }
 }
 
@@ -659,6 +692,11 @@ function setupEventListeners() {
   // Auto AI Toggle
   autoAiCheckbox.addEventListener('change', () => {
     saveAutoAIToggle(autoAiCheckbox.checked);
+  });
+  
+  // Image Only Toggle
+  imageOnlyCheckbox.addEventListener('change', () => {
+    saveImageOnlyToggle(imageOnlyCheckbox.checked);
   });
   
   // Group by Number Toggle
