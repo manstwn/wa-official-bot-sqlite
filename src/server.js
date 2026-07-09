@@ -37,6 +37,9 @@ app.use(express.json({ limit: '50mb' }));
 // Serve landing page at root /
 app.use(express.static(path.join(rootDir, 'landing-page')));
 
+// Serve uploads directory at /uploads
+app.use('/uploads', express.static(path.join(rootDir, 'public/uploads')));
+
 // Serve admin dashboard at /admin
 app.use('/admin', express.static(path.join(rootDir, 'public'), {
   setHeaders(res, filePath) {
@@ -89,12 +92,19 @@ async function downloadMedia(url, type, messageId) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      'Connection': 'close'
+    };
+
+    const token = process.env.WA_ACCESS_TOKEN;
+    if (token && (url.includes('facebook.com') || url.includes('fbsbx.com') || url.includes('metaapp.imanstwn.my.id'))) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        'Connection': 'close'
-      },
+      headers,
       redirect: 'follow',
       signal: controller.signal
     });
