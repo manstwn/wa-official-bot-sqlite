@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.join(__dirname, '..');
 import { 
   saveMessage, 
   readMessages, 
@@ -13,7 +18,10 @@ import {
   readAIHistory,
   writeAIHistory,
   deleteAIHistoryEntry,
-  getChatHistory
+  getChatHistory,
+  writeSystemLog,
+  readSystemLogs,
+  clearSystemLogs
 } from './db.js';
 
 dotenv.config();
@@ -25,7 +33,12 @@ const WEBHOOK_PATH = process.env.WEBHOOK_PATH || '/webhook';
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static('public', {
+
+// Serve landing page at root /
+app.use(express.static(path.join(rootDir, 'landing-page')));
+
+// Serve admin dashboard at /admin
+app.use('/admin', express.static(path.join(rootDir, 'public'), {
   setHeaders(res, filePath) {
     if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -45,6 +58,16 @@ function broadcast(payload) {
   });
 }
 
+async function logSystemActivity(level, message) {
+  const log = await writeSystemLog(level, message);
+  if (log) {
+    broadcast({
+      type: 'SYSTEM_LOG',
+      log
+    });
+  }
+}
+
 // Helper to download media via fetch with timeout
 async function downloadMedia(url, type, messageId) {
   try {
@@ -54,14 +77,14 @@ async function downloadMedia(url, type, messageId) {
       video: '.mp4'
     };
     const ext = extMap[type] || '.bin';
-    const uploadsDir = path.resolve('public/uploads');
+    const uploadsDir = path.join(rootDir, 'public/uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     const fileName = `${messageId}${ext}`;
     const localFilePath = path.join(uploadsDir, fileName);
 
-    console.log(`[Media Downloader] Downloading media from: ${url}`);
+    await logSystemActivity('info', `Pengunduh Media: Mengunduh media dari: ${url}`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -84,10 +107,10 @@ async function downloadMedia(url, type, messageId) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await fs.promises.writeFile(localFilePath, buffer);
-    console.log(`[Media Downloader] Successfully saved media to: ${localFilePath}`);
+    await logSystemActivity('info', `Pengunduh Media: Sukses mengunduh dan menyimpan media ke ${fileName}`);
     return `/uploads/${fileName}`;
   } catch (err) {
-    console.error(`[Media Downloader Error] Failed to download media for ${messageId}: ${err.name} ${err.message}`);
+    await logSystemActivity('error', `Pengunduh Media: Gagal mengunduh media untuk ${messageId}: ${err.message}`);
     return null;
   }
 }
@@ -114,16 +137,16 @@ async function sendWhatsAppReply(to, body) {
     });
     const data = await res.json();
     if (!res.ok) {
-      console.error('[WA Reply] Meta API error:', data);
+      await logSystemActivity('error', `Gagal mengirim balasan WA ke +${to}. Meta API Error: ${data.error ? data.error.message : JSON.stringify(data)}`);
     } else {
-      console.log(`[WA Reply] Sent to +${to}: "${body.substring(0, 60)}"`);
+      await logSystemActivity('info', `Balasan WA berhasil dikirim ke +${to}: "${body.substring(0, 50)}..."`);
       metaApiResponse = data;
       if (data.messages && data.messages[0] && data.messages[0].id) {
         messageId = data.messages[0].id;
       }
     }
   } else {
-    console.log('[WA Reply] WA_ACCESS_TOKEN not configured. Saving locally only.');
+    await logSystemActivity('warn', `Simulasi balasan WA (Token tidak diatur) ke +${to}: "${body.substring(0, 50)}..."`);
   }
 
   // Save to local DB and broadcast so it appears in the Chat View
@@ -148,7 +171,9 @@ async function sendWhatsAppReply(to, body) {
 // ============================================================
 async function callAIWithImage(imageBase64, mimeType, aiConfig) {
   const provider = aiConfig.provider || 'gemini';
-  const model = aiConfig.model || (provider === 'gemini' ? 'gemini-2.0-flash-lite' : 'google/gemini-2.0-flash-lite-001');
+  const model = provider === 'gemini'
+    ? (aiConfig.geminiModel || aiConfig.model || 'gemini-2.0-flash-lite')
+    : (aiConfig.openrouterModel || aiConfig.model || 'google/gemini-2.0-flash-lite-001');
   const apiKey = provider === 'openrouter' ? aiConfig.openrouterKey : aiConfig.geminiKey;
 
   if (!apiKey || apiKey.trim() === '') {
@@ -205,7 +230,9 @@ async function callAIWithImage(imageBase64, mimeType, aiConfig) {
 // ============================================================
 async function callAIWithHistory(history, userMessage, aiConfig) {
   const provider = aiConfig.provider || 'gemini';
-  const model = aiConfig.model || (provider === 'gemini' ? 'gemini-2.0-flash-lite' : 'google/gemini-2.0-flash-lite-001');
+  const model = provider === 'gemini'
+    ? (aiConfig.geminiModel || aiConfig.model || 'gemini-2.0-flash-lite')
+    : (aiConfig.openrouterModel || aiConfig.model || 'google/gemini-2.0-flash-lite-001');
   const apiKey = provider === 'openrouter' ? aiConfig.openrouterKey : aiConfig.geminiKey;
 
   if (!apiKey || apiKey.trim() === '') {
@@ -235,7 +262,7 @@ async function callAIWithHistory(history, userMessage, aiConfig) {
       geminiBody.system_instruction = { parts: [{ text: aiConfig.systemPrompt }] };
     }
 
-    console.log(`[Auto AI] Dispatching text history request to Gemini API. Model: ${model}, History size: ${history.length}`);
+    console.log(`[Auto AI] Mengirim permintaan riwayat teks ke API Gemini. Model: ${model}, Jumlah Riwayat: ${history.length}`);
     const geminiRes = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -268,7 +295,7 @@ async function callAIWithHistory(history, userMessage, aiConfig) {
       content: userMessage
     });
 
-    console.log(`[Auto AI] Dispatching text history request to OpenRouter API. Model: ${model}, History size: ${history.length}`);
+    console.log(`[Auto AI] Mengirim permintaan riwayat teks ke API OpenRouter. Model: ${model}, Jumlah Riwayat: ${history.length}`);
     const orRes = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -308,7 +335,7 @@ app.post('/api/auto-ai/toggle', async (req, res) => {
     const cfg = await readAIConfig();
     cfg.autoAiEnabled = !!enabled;
     await writeAIConfig(cfg);
-    console.log(`[Auto AI] Toggle set to ${cfg.autoAiEnabled ? 'ON' : 'OFF'}`);
+    console.log(`[Auto AI] Toggle diatur ke ${cfg.autoAiEnabled ? 'NYALA' : 'MATI'}`);
     return res.json({ success: true, enabled: cfg.autoAiEnabled });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -333,18 +360,19 @@ app.post('/api/auto-ai/image-only', async (req, res) => {
     const cfg = await readAIConfig();
     cfg.imageOnly = !!imageOnly;
     await writeAIConfig(cfg);
-    console.log(`[Auto AI] Image Only set to ${cfg.imageOnly ? 'ON' : 'OFF'}`);
+    console.log(`[Auto AI] Image Only diatur ke ${cfg.imageOnly ? 'NYALA' : 'MATI'}`);
     return res.json({ success: true, imageOnly: cfg.imageOnly });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Webhook Receiver
 app.post(WEBHOOK_PATH, async (req, res) => {
   try {
     const payload = req.body;
-    console.log(`[Webhook] Received payload at ${new Date().toISOString()}:`, JSON.stringify(payload, null, 2));
+    const msgPreview = payload.type === 'text' ? `"${payload.body}"` : `[${(payload.type || 'media').toUpperCase()}]`;
+    console.log(`[Webhook] Pesan masuk dari +${payload.from || 'unknown'}: ${msgPreview}`);
+    await logSystemActivity('info', `Webhook: Pesan masuk diterima dari +${payload.from || 'unknown'}: ${msgPreview}`);
 
     // Save payload to JSON database
     const savedRecord = await saveMessage(payload);
@@ -365,7 +393,7 @@ app.post(WEBHOOK_PATH, async (req, res) => {
           broadcast(updatedRecord);
         }
       } catch (dlErr) {
-        console.error('[Media Downloader Sync Error]', dlErr.message);
+        await logSystemActivity('error', `Pengunduh Media: Gagal mengunduh media. Error: ${dlErr.message}`);
       }
     }
 
@@ -384,24 +412,25 @@ app.post(WEBHOOK_PATH, async (req, res) => {
           const fromNumber = payload.from;
 
           if (!cfg.autoAiEnabled) {
-            console.log(`[Auto AI] Maintenance mode is ON. Skipping response for +${fromNumber}.`);
+            await logSystemActivity('warn', `Auto AI: Mode Pemeliharaan aktif. Mengirim pesan pemberitahuan pemeliharaan ke +${fromNumber}.`);
+            await sendWhatsAppReply(fromNumber, 'Maaf, asisten AI kami saat ini sedang dalam pemeliharaan (maintenance) untuk peningkatan sistem. Silakan hubungi kami kembali beberapa saat lagi.');
             return;
           }
 
           if (payload.type === 'text') {
             if (cfg.imageOnly) {
-              console.log(`[Auto AI] Text message received from +${fromNumber}, but Image Only toggle is enabled. Skipping.`);
+              await logSystemActivity('warn', `Auto AI: Mode Image-Only aktif. Mengabaikan pesan teks dari +${fromNumber}.`);
               return;
             }
 
-            console.log(`[Auto AI] Processing text message from +${fromNumber} with ${cfg.provider}...`);
+            await logSystemActivity('info', `Auto AI: Memproses pesan teks dari +${fromNumber} dengan ${cfg.provider}...`);
             // Fetch history context (last 9 text messages)
             const history = await getChatHistory(fromNumber, 9);
             try {
               const aiReply = await callAIWithHistory(history, payload.body, cfg);
               await sendWhatsAppReply(fromNumber, aiReply);
             } catch (aiErr) {
-              console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
+              await logSystemActivity('error', `Auto AI: Error AI untuk +${fromNumber}: ${aiErr.message}`);
               await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses pesan Anda.');
             }
           }
@@ -412,32 +441,34 @@ app.post(WEBHOOK_PATH, async (req, res) => {
             await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
 
             if (localPath) {
-              const fullPath = path.resolve('public' + localPath);
+              const fullPath = path.join(rootDir, 'public', localPath);
               const imageBuffer = await fs.promises.readFile(fullPath);
               const base64 = imageBuffer.toString('base64');
               const ext = path.extname(localPath).toLowerCase();
               const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
               const mimeType = mimeMap[ext] || 'image/jpeg';
 
-              console.log(`[Auto AI] Processing image from +${fromNumber} with ${cfg.provider}...`);
+              await logSystemActivity('info', `Auto AI: Memproses gambar dari +${fromNumber} dengan ${cfg.provider}...`);
               try {
                 const aiReply = await callAIWithImage(base64, mimeType, cfg);
                 await sendWhatsAppReply(fromNumber, aiReply);
               } catch (aiErr) {
-                console.error(`[Auto AI] AI error for +${fromNumber}:`, aiErr.message);
+                await logSystemActivity('error', `Auto AI: Error AI untuk +${fromNumber}: ${aiErr.message}`);
                 await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
               }
             } else {
+              await logSystemActivity('error', `Auto AI: Gagal memproses gambar dari +${fromNumber} karena media tidak terunduh.`);
               await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
             }
           }
         } catch (err) {
-          console.error('[Auto AI Background Error]', err);
+          await logSystemActivity('error', `Auto AI: Error latar belakang: ${err.message}`);
         }
       })();
     }
   } catch (error) {
     console.error('[Webhook Error] Error processing incoming payload:', error);
+    await logSystemActivity('error', `Webhook Error: ${error.message}`);
     if (!res.headersSent) {
       return res.status(500).json({
         success: false,
@@ -464,16 +495,20 @@ app.get('/api/config', async (req, res) => {
 // POST /api/config — save AI config
 app.post('/api/config', async (req, res) => {
   try {
-    const { provider, model, geminiKey, openrouterKey, systemPrompt } = req.body;
+    const { provider, model, geminiModel, openrouterModel, geminiKey, openrouterKey, systemPrompt } = req.body;
     const existing = await readAIConfig();
     const updated = await writeAIConfig({
       provider: provider ?? existing.provider,
       model: model ?? existing.model,
+      geminiModel: geminiModel ?? existing.geminiModel,
+      openrouterModel: openrouterModel ?? existing.openrouterModel,
       geminiKey: geminiKey ?? existing.geminiKey,
       openrouterKey: openrouterKey ?? existing.openrouterKey,
       systemPrompt: systemPrompt ?? existing.systemPrompt,
+      autoAiEnabled: existing.autoAiEnabled,
+      imageOnly: existing.imageOnly
     });
-    console.log(`[Config] AI config saved. Provider: ${updated.provider}, Model: ${updated.model}`);
+    await logSystemActivity('info', `Konfigurasi AI diperbarui. Provider: ${updated.provider}, Gemini Model: ${updated.geminiModel}, OpenRouter Model: ${updated.openrouterModel}`);
     return res.json({ success: true, config: updated });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -494,11 +529,33 @@ app.get('/api/messages', async (req, res) => {
 app.delete('/api/messages', async (req, res) => {
   try {
     await clearMessages();
+    await clearSystemLogs();
     // Broadcast clear event to reset client UIs
     broadcast({ type: 'SYSTEM_CLEAR' });
     return res.json({ success: true, message: 'Message database cleared.' });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// API: Get system logs
+app.get('/api/system-logs', async (req, res) => {
+  try {
+    const logs = await readSystemLogs();
+    return res.json(logs);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: Clear system logs
+app.delete('/api/system-logs', async (req, res) => {
+  try {
+    await clearSystemLogs();
+    broadcast({ type: 'SYSTEM_LOGS_CLEAR' });
+    return res.json({ success: true, message: 'System logs cleared.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -600,7 +657,7 @@ app.get('/api/stream', (req, res) => {
 
   // Add client to active clients list
   clients.push(res);
-  console.log(`[SSE] Client connected. Active streams: ${clients.length}`);
+  console.log(`[SSE] Klien terhubung. Aliran aktif: ${clients.length}`);
 
   // Send an initial handshake/keep-alive
   res.write(`data: ${JSON.stringify({ type: 'SYSTEM_CONNECTED', activeClients: clients.length })}\n\n`);
@@ -614,7 +671,7 @@ app.get('/api/stream', (req, res) => {
   req.on('close', () => {
     clearInterval(keepAliveInterval);
     clients = clients.filter(client => client !== res);
-    console.log(`[SSE] Client disconnected. Active streams: ${clients.length}`);
+    console.log(`[SSE] Klien terputus. Aliran aktif: ${clients.length}`);
   });
 });
 
@@ -628,7 +685,7 @@ app.post('/api/ai-test', async (req, res) => {
     const savedCfg = await readAIConfig();
 
     const provider = req.body.provider || savedCfg.provider || 'gemini';
-    const model = req.body.model || savedCfg.model;
+    const model = req.body.model || (provider === 'gemini' ? (savedCfg.geminiModel || savedCfg.model || 'gemini-2.0-flash-lite') : (savedCfg.openrouterModel || savedCfg.model || 'google/gemini-2.0-flash-lite-001'));
     const systemPrompt = req.body.systemPrompt ?? savedCfg.systemPrompt;
     const userMessage = req.body.userMessage;
     const imageBase64 = req.body.imageBase64;
@@ -838,25 +895,56 @@ app.delete('/api/ai-history/:time', async (req, res) => {
   }
 });
 
-// GET /api/config/landing — return landing page URL from env
-app.get('/api/config/landing', (req, res) => {
-  const url = process.env.LANDINGPAGE || null;
-  return res.json({ url });
+// GET /api/landing-config — return phone number and admin link for the landing page
+app.get('/api/landing-config', (req, res) => {
+  return res.json({
+    phoneNumber: process.env.BOT_PHONE_NUMBER || '6281809181193',
+    backendLink: '/admin'
+  });
 });
 
 // Start the server
 app.listen(PORT, async () => {
+  const isCfEnabled = process.env.CF_TUNNEL === 'true' || process.env.CF_TUNNEL === 'TRUE';
+  const cfUrl = process.env.CLOUDFLARE_URL || '';
+
   console.log(`==================================================`);
-  console.log(` WhatsApp Webhook Receiver Server Started!`);
+  console.log(` 💬 Server Webhook Receiver WhatsApp Telah Aktif!`);
   console.log(` Port: ${PORT}`);
-  console.log(` Webhook URL: http://localhost:${PORT}${WEBHOOK_PATH}`);
-  console.log(` Web Dashboard: http://localhost:${PORT}`);
+  console.log(`--------------------------------------------------`);
+  console.log(` [ LAYANAN LOKAL ]`);
+  console.log(` Halaman Utama: http://localhost:${PORT}`);
+  console.log(` Dasbor Web:    http://localhost:${PORT}/admin`);
+  console.log(` URL Webhook:   http://localhost:${PORT}${WEBHOOK_PATH}`);
+  
+  if (isCfEnabled && cfUrl) {
+    console.log(`--------------------------------------------------`);
+    console.log(` [ TEROWONGAN CLOUDFLARE ]`);
+    console.log(` Halaman Utama: ${cfUrl}`);
+    console.log(` Dasbor Web:    ${cfUrl}/admin`);
+    console.log(` URL Webhook:   ${cfUrl}${WEBHOOK_PATH}`);
+    console.log(`--------------------------------------------------`);
+    console.log(` ⚠️ Pastikan webhook sistem ${cfUrl}${WEBHOOK_PATH}`);
+    console.log(` ini telah dikonfigurasi di Aplikasi Developer Meta`);
+  } else {
+    console.log(`--------------------------------------------------`);
+    console.log(` [ PERINGATAN ]`);
+    console.log(` Cloudflare Tunnel dinonaktifkan. Ini hanya untuk`);
+    console.log(` debugging lokal. Pesan webhook dari Meta TIDAK`);
+    console.log(` AKAN masuk ke sistem lokal ini!`);
+  }
   console.log(`==================================================`);
 
   // Start Cloudflare Tunnel if requested in environment variables
-  // Start Cloudflare Tunnel if requested in environment variables
   if (process.env.CF_TUNNEL === 'true' || process.env.CF_TUNNEL === 'TRUE') {
-    console.log('[Cloudflare Tunnel] Starting tunnel...');
+    const isDebug = process.env.CF_DEBUG === 'true' || process.env.CF_DEBUG === 'TRUE';
+
+    if (isDebug) {
+      console.log('[Cloudflare Tunnel] Starting tunnel...');
+    } else {
+      console.log('[Cloudflare Tunnel] Menginisiasi Cloudflare...');
+    }
+
     try {
       const { spawn } = await import('child_process');
       const fs = await import('fs');
@@ -878,21 +966,32 @@ app.listen(PORT, async () => {
 
       const args = [];
       if (!token || token === 'xxxx') {
-        console.warn('[Cloudflare Tunnel Warning] CF_TUNNEL_TOKEN is not configured in .env! Defaulting to local tunnel...');
+        if (isDebug) {
+          console.warn('[Cloudflare Tunnel Warning] CF_TUNNEL_TOKEN is not configured in .env! Defaulting to local tunnel...');
+        }
         args.push('tunnel', '--url', `http://localhost:${PORT}`);
       } else {
-        console.log(`[Cloudflare Tunnel] Establishing tunnel with token: ${token.substring(0, 4)}...`);
+        if (isDebug) {
+          console.log(`[Cloudflare Tunnel] Establishing tunnel with token: ${token.substring(0, 4)}...`);
+        }
         args.push('tunnel', 'run', '--token', token);
       }
 
-      console.log(`[Cloudflare Tunnel] Spawning global tunnel: ${bin} ${args.join(' ')}`);
-      const cfTunnelProc = spawn(bin, args, { stdio: 'inherit' });
-      cfTunnelProc.on('error', (err) => console.error('[Cloudflare Tunnel Error] Spawn error:', err));
+      if (isDebug) {
+        console.log(`[Cloudflare Tunnel] Spawning global tunnel: ${bin} ${args.join(' ')}`);
+      }
+
+      const cfTunnelProc = spawn(bin, args, { stdio: isDebug ? 'inherit' : 'ignore' });
+      cfTunnelProc.on('error', (err) => {
+        if (isDebug) console.error('[Cloudflare Tunnel Error] Spawn error:', err);
+      });
       cfTunnelProc.on('exit', (code) => {
-        console.warn(`[Cloudflare Tunnel Warning] Tunnel process exited with code ${code}. Express server is still running.`);
+        if (isDebug) {
+          console.warn(`[Cloudflare Tunnel Warning] Tunnel process exited with code ${code}. Express server is still running.`);
+        }
       });
     } catch (err) {
-      console.error('[Cloudflare Tunnel Error] Failed to initialize tunnel:', err);
+      if (isDebug) console.error('[Cloudflare Tunnel Error] Failed to initialize tunnel:', err);
     }
   }
 });

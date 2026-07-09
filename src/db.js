@@ -1,8 +1,11 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const DATA_DIR = path.resolve('data');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.join(__dirname, '../data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -37,6 +40,8 @@ db.exec(`
     id INTEGER PRIMARY KEY CHECK (id = 1),
     provider TEXT DEFAULT 'gemini',
     model TEXT DEFAULT 'gemini-2.0-flash-lite',
+    geminiModel TEXT DEFAULT 'gemini-2.0-flash-lite',
+    openrouterModel TEXT DEFAULT 'google/gemini-2.0-flash-lite-001',
     geminiKey TEXT DEFAULT '',
     openrouterKey TEXT DEFAULT '',
     systemPrompt TEXT DEFAULT '',
@@ -48,13 +53,26 @@ db.exec(`
     time TEXT PRIMARY KEY,
     entry TEXT NOT NULL -- JSON string
   );
+
+  CREATE TABLE IF NOT EXISTS system_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    level TEXT NOT NULL,
+    message TEXT NOT NULL
+  );
 `);
 
 // Add new columns to existing schema if necessary
 try {
   db.exec(`ALTER TABLE ai_config ADD COLUMN imageOnly INTEGER DEFAULT 0`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE ai_config ADD COLUMN geminiModel TEXT DEFAULT 'gemini-2.0-flash-lite'`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE ai_config ADD COLUMN openrouterModel TEXT DEFAULT 'google/gemini-2.0-flash-lite-001'`);
 } catch (e) {
-  // Ignored if column already exists
+  // Ignored if columns already exist
 }
 
 // ============================================================
@@ -307,6 +325,8 @@ export async function readAIConfig() {
       return {
         provider: 'gemini',
         model: 'gemini-2.0-flash-lite',
+        geminiModel: 'gemini-2.0-flash-lite',
+        openrouterModel: 'google/gemini-2.0-flash-lite-001',
         geminiKey: '',
         openrouterKey: '',
         systemPrompt: '',
@@ -317,6 +337,8 @@ export async function readAIConfig() {
     return {
       provider: row.provider,
       model: row.model,
+      geminiModel: row.geminiModel || 'gemini-2.0-flash-lite',
+      openrouterModel: row.openrouterModel || 'google/gemini-2.0-flash-lite-001',
       geminiKey: row.geminiKey,
       openrouterKey: row.openrouterKey,
       systemPrompt: row.systemPrompt,
@@ -328,6 +350,8 @@ export async function readAIConfig() {
     return {
       provider: 'gemini',
       model: 'gemini-2.0-flash-lite',
+      geminiModel: 'gemini-2.0-flash-lite',
+      openrouterModel: 'google/gemini-2.0-flash-lite-001',
       geminiKey: '',
       openrouterKey: '',
       systemPrompt: '',
@@ -343,14 +367,26 @@ export async function readAIConfig() {
 export async function writeAIConfig(cfg) {
   try {
     const current = await readAIConfig();
-    const merged = { ...current, ...cfg };
+    const merged = {
+      provider: cfg.provider !== undefined ? cfg.provider : current.provider,
+      model: cfg.model !== undefined ? cfg.model : current.model,
+      geminiModel: cfg.geminiModel !== undefined ? cfg.geminiModel : current.geminiModel,
+      openrouterModel: cfg.openrouterModel !== undefined ? cfg.openrouterModel : current.openrouterModel,
+      geminiKey: cfg.geminiKey !== undefined ? cfg.geminiKey : current.geminiKey,
+      openrouterKey: cfg.openrouterKey !== undefined ? cfg.openrouterKey : current.openrouterKey,
+      systemPrompt: cfg.systemPrompt !== undefined ? cfg.systemPrompt : current.systemPrompt,
+      autoAiEnabled: cfg.autoAiEnabled !== undefined ? cfg.autoAiEnabled : current.autoAiEnabled,
+      imageOnly: cfg.imageOnly !== undefined ? cfg.imageOnly : current.imageOnly
+    };
 
     db.prepare(`
-      INSERT INTO ai_config (id, provider, model, geminiKey, openrouterKey, systemPrompt, autoAiEnabled, imageOnly)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ai_config (id, provider, model, geminiModel, openrouterModel, geminiKey, openrouterKey, systemPrompt, autoAiEnabled, imageOnly)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         provider = excluded.provider,
         model = excluded.model,
+        geminiModel = excluded.geminiModel,
+        openrouterModel = excluded.openrouterModel,
         geminiKey = excluded.geminiKey,
         openrouterKey = excluded.openrouterKey,
         systemPrompt = excluded.systemPrompt,
@@ -359,6 +395,8 @@ export async function writeAIConfig(cfg) {
     `).run(
       merged.provider,
       merged.model,
+      merged.geminiModel,
+      merged.openrouterModel,
       merged.geminiKey,
       merged.openrouterKey,
       merged.systemPrompt,
@@ -439,5 +477,42 @@ export async function getChatHistory(phoneNumber, limit = 9) {
   } catch (error) {
     console.error('Error fetching chat history from SQLite:', error);
     return [];
+  }
+}
+
+/**
+ * Write a system log entry.
+ */
+export async function writeSystemLog(level, message) {
+  try {
+    const timestamp = new Date().toISOString();
+    const result = db.prepare(`INSERT INTO system_logs (timestamp, level, message) VALUES (?, ?, ?)`).run(timestamp, level, message);
+    return { id: result.lastInsertRowid, timestamp, level, message };
+  } catch (error) {
+    console.error('Error writing system log:', error);
+    return null;
+  }
+}
+
+/**
+ * Read system log entries.
+ */
+export async function readSystemLogs(limit = 100) {
+  try {
+    return db.prepare(`SELECT * FROM system_logs ORDER BY id DESC LIMIT ?`).all(limit);
+  } catch (error) {
+    console.error('Error reading system logs:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear all system logs.
+ */
+export async function clearSystemLogs() {
+  try {
+    db.prepare(`DELETE FROM system_logs`).run();
+  } catch (error) {
+    console.error('Error clearing system logs:', error);
   }
 }

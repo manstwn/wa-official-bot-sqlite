@@ -5,12 +5,12 @@
 // ---- Auth Check ----
 (async function() {
   const token = sessionStorage.getItem('wa_token');
-  if (!token) { window.location.href = '/login.html'; return; }
+  if (!token) { window.location.href = '/admin/login.html'; return; }
   try {
     const r = await fetch('/api/auth/check?token=' + encodeURIComponent(token));
     const d = await r.json();
-    if (!d.valid) { sessionStorage.removeItem('wa_token'); window.location.href = '/login.html'; }
-  } catch { window.location.href = '/login.html'; }
+    if (!d.valid) { sessionStorage.removeItem('wa_token'); window.location.href = '/admin/login.html'; }
+  } catch { window.location.href = '/admin/login.html'; }
 })();
 
 // ---- State ----
@@ -37,11 +37,12 @@ async function saveConfigToServer() {
   setSaveStatus('saving', '↑ Saving…');
   try {
     const cfg = {
-      provider:      currentProvider,
-      model:         modelInput.value.trim(),
-      geminiKey:     geminiKeyInput.value.trim(),
-      openrouterKey: openrouterKeyInput.value.trim(),
-      systemPrompt:  systemPromptInput.value
+      provider:        currentProvider,
+      geminiModel:     geminiModelInput.value.trim(),
+      openrouterModel: orModelInput.value.trim(),
+      geminiKey:       geminiKeyInput.value.trim(),
+      openrouterKey:   openrouterKeyInput.value.trim(),
+      systemPrompt:    systemPromptInput.value
     };
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -86,19 +87,28 @@ function applyConfig(cfg) {
     currentProvider = cfg.provider;
     tabGemini.classList.toggle('active', currentProvider === 'gemini');
     tabOpenRouter.classList.toggle('active', currentProvider === 'openrouter');
-    updateModelHint();
+    if (currentProvider === 'gemini') {
+      groupGemini.style.display = 'block';
+      groupOpenRouter.style.display = 'none';
+    } else {
+      groupGemini.style.display = 'none';
+      groupOpenRouter.style.display = 'block';
+    }
   }
-  if (cfg.model)         modelInput.value         = cfg.model;
-  if (cfg.geminiKey)     geminiKeyInput.value     = cfg.geminiKey;
-  if (cfg.openrouterKey) openrouterKeyInput.value = cfg.openrouterKey;
+  if (cfg.geminiModel)     geminiModelInput.value   = cfg.geminiModel;
+  if (cfg.openrouterModel) orModelInput.value       = cfg.openrouterModel;
+  if (cfg.geminiKey)       geminiKeyInput.value     = cfg.geminiKey;
+  if (cfg.openrouterKey)   openrouterKeyInput.value = cfg.openrouterKey;
   if (cfg.systemPrompt !== undefined) systemPromptInput.value = cfg.systemPrompt;
 }
 
 // ---- DOM Refs ----
 const tabGemini = document.getElementById('tab-gemini');
 const tabOpenRouter = document.getElementById('tab-openrouter');
-const modelInput = document.getElementById('model-input');
-const modelHint = document.getElementById('model-hint');
+const groupGemini = document.getElementById('cfg-group-gemini');
+const groupOpenRouter = document.getElementById('cfg-group-openrouter');
+const geminiModelInput = document.getElementById('gemini-model-input');
+const orModelInput = document.getElementById('or-model-input');
 const geminiKeyInput = document.getElementById('gemini-key-input');
 const openrouterKeyInput = document.getElementById('openrouter-key-input');
 const saveConfigBtn = document.getElementById('save-config-btn');
@@ -159,7 +169,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadHistory();
 
   // Auto-save with debounce on any config field change
-  modelInput.addEventListener('input', scheduleAutoSave);
+  geminiModelInput.addEventListener('input', scheduleAutoSave);
+  orModelInput.addEventListener('input', scheduleAutoSave);
   geminiKeyInput.addEventListener('input', scheduleAutoSave);
   openrouterKeyInput.addEventListener('input', scheduleAutoSave);
   systemPromptInput.addEventListener('input', () => { updateCharCounts(); scheduleAutoSave(); });
@@ -170,13 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ---- Provider Tabs ----
-function updateModelHint() {
-  if (currentProvider === 'gemini') {
-    modelHint.textContent = 'Default Gemini model. Try: gemini-1.5-pro, gemini-2.0-flash-lite, gemini-3.1-flash-lite-preview';
-  } else {
-    modelHint.textContent = 'OpenRouter model ID. Try: google/gemini-2.0-flash-lite-001, openai/gpt-4o-mini, anthropic/claude-haiku';
-  }
-}
+function updateModelHint() {}
 
 function bindProviderTabs() {
   [tabGemini, tabOpenRouter].forEach(tab => {
@@ -185,13 +190,13 @@ function bindProviderTabs() {
       tabGemini.classList.toggle('active', currentProvider === 'gemini');
       tabOpenRouter.classList.toggle('active', currentProvider === 'openrouter');
 
-      // Only set default model if user hasn't customized it
-      if (currentProvider === 'gemini' && modelInput.value.startsWith('google/')) {
-        modelInput.value = 'gemini-2.0-flash-lite';
-      } else if (currentProvider === 'openrouter' && !modelInput.value.includes('/')) {
-        modelInput.value = 'google/gemini-2.0-flash-lite-001';
+      if (currentProvider === 'gemini') {
+        groupGemini.style.display = 'block';
+        groupOpenRouter.style.display = 'none';
+      } else {
+        groupGemini.style.display = 'none';
+        groupOpenRouter.style.display = 'block';
       }
-      updateModelHint();
       scheduleAutoSave();
     });
   });
@@ -280,7 +285,7 @@ function bindRunButton() {
 
 async function runAITest() {
   const provider = currentProvider;
-  const model = modelInput.value.trim();
+  const model = provider === 'gemini' ? geminiModelInput.value.trim() : orModelInput.value.trim();
   const systemPrompt = systemPromptInput.value.trim();
   const userMessage = userMessageInput.value.trim();
 

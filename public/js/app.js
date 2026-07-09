@@ -6,6 +6,7 @@ let eventSource = null;
 let activeTab = 'chat'; // 'chat' or 'debug'
 let groupByNumber = true;
 let replyLocked = false;
+let systemLogsList = [];
 
 // DOM Elements
 const connStatus = document.getElementById('conn-status');
@@ -80,38 +81,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await res.json();
       if (!data.valid) {
         sessionStorage.removeItem('wa_token');
-        window.location.href = '/login.html';
+        window.location.href = '/admin/login.html';
         return;
       }
     } catch {
-      window.location.href = '/login.html';
+      window.location.href = '/admin/login.html';
       return;
     }
   } else {
-    window.location.href = '/login.html';
+    window.location.href = '/admin/login.html';
     return;
   }
 
   // 1. Fetch initial records
   fetchMessages();
-  
+  fetchSystemLogs();
+
   // 2. Open real-time SSE stream
   connectSSE();
-  
+
   // 3. Load Maintenance toggle state
   fetchMaintenanceToggle();
   fetchImageOnlyToggle();
-  
+
   // 4. Bind UI interactions
   setupEventListeners();
-  
+
   // 5. Apply default ON state for group-by toggle
   btnToggleGroup.style.background = 'var(--color-brand)';
   btnToggleGroup.style.color = 'white';
   btnToggleGroup.style.borderColor = 'var(--color-brand)';
   btnToggleGroup.style.boxShadow = '0 0 10px var(--color-brand-glow)';
   btnToggleGroup.title = 'Show Raw Payload Stream';
-  
+
   // Initialize Lucide Icons
   lucide.createIcons();
 });
@@ -132,14 +134,14 @@ async function fetchMessages() {
 
 // Clear messages database
 async function clearLogs() {
-  if (!confirm('Are you sure you want to clear all stored webhook logs? This cannot be undone.')) {
+  if (!confirm('Apakah Anda yakin ingin menghapus semua riwayat data webhook? Tindakan ini tidak dapat dibatalkan.')) {
     return;
   }
-  
+
   try {
     const res = await fetch('/api/messages', { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to clear messages');
-    
+
     messagesList = [];
     selectedMessageId = null;
     updateStats();
@@ -159,6 +161,7 @@ async function fetchMaintenanceToggle() {
     if (data.success) {
       // Inverted logic: Maintenance is active (checked) if autoAiEnabled is false (not enabled)
       maintenanceCheckbox.checked = !data.enabled;
+      updateAiActiveIndicator();
     }
   } catch (error) {
     console.error('Error fetching Maintenance toggle:', error);
@@ -177,10 +180,12 @@ async function saveMaintenanceToggle(active) {
     });
     if (!res.ok) throw new Error('Failed to save toggle');
     console.log(`[Maintenance] Mode set to ${active ? 'ON (Replies disabled)' : 'OFF (Replies enabled)'}`);
+    updateAiActiveIndicator();
   } catch (error) {
     console.error('Error saving Maintenance toggle:', error);
     // Revert checkbox on failure
     maintenanceCheckbox.checked = !active;
+    updateAiActiveIndicator();
   }
 }
 
@@ -192,6 +197,7 @@ async function fetchImageOnlyToggle() {
     const data = await res.json();
     if (data.success) {
       imageOnlyCheckbox.checked = !!data.imageOnly;
+      updateAiActiveIndicator();
     }
   } catch (error) {
     console.error('Error fetching Image Only toggle:', error);
@@ -208,10 +214,12 @@ async function saveImageOnlyToggle(imageOnly) {
     });
     if (!res.ok) throw new Error('Failed to save toggle');
     console.log(`[Auto AI] Image Only ${imageOnly ? 'ON' : 'OFF'}`);
+    updateAiActiveIndicator();
   } catch (error) {
     console.error('Error saving Image Only toggle:', error);
     // Revert checkbox on failure
     imageOnlyCheckbox.checked = !imageOnly;
+    updateAiActiveIndicator();
   }
 }
 
@@ -220,14 +228,14 @@ async function saveImageOnlyToggle(imageOnly) {
    ========================================================================== */
 function connectSSE() {
   setConnectionStatus('connecting');
-  
+
   // Create EventSource
   eventSource = new EventSource('/api/stream');
-  
+
   eventSource.onopen = () => {
     setConnectionStatus('connected');
   };
-  
+
   eventSource.onerror = (err) => {
     console.error('SSE Error:', err);
     setConnectionStatus('disconnected');
@@ -235,26 +243,41 @@ function connectSSE() {
     eventSource.close();
     setTimeout(connectSSE, 5000);
   };
-  
+
   eventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      
+
       // Handle system events
       if (data.type === 'SYSTEM_CONNECTED') {
         console.log(`[SSE] Handshake complete. Active connections: ${data.activeClients}`);
         return;
       }
-      
+
       if (data.type === 'SYSTEM_CLEAR') {
         messagesList = [];
+        systemLogsList = [];
         selectedMessageId = null;
         updateStats();
         renderFeed();
+        renderSystemLogs();
         resetDetailPanel();
         return;
       }
-      
+
+      if (data.type === 'SYSTEM_LOG') {
+        systemLogsList.unshift(data.log);
+        if (systemLogsList.length > 100) systemLogsList.pop();
+        renderSystemLogs();
+        return;
+      }
+
+      if (data.type === 'SYSTEM_LOGS_CLEAR') {
+        systemLogsList = [];
+        renderSystemLogs();
+        return;
+      }
+
       // Handle normal webhook insertion (check if already exists to update media path)
       const selectedMsg = messagesList.find(m => m.id === selectedMessageId);
       const activeContact = selectedMsg ? ((selectedMsg.from === 'system' || !selectedMsg.from) ? selectedMsg.to : selectedMsg.from) : null;
@@ -269,19 +292,19 @@ function connectSSE() {
       } else {
         messagesList.unshift(data); // Add to local state list
       }
-      
+
       // If this message belongs to the active contact conversation, refresh bubbles
       const incomingContact = (data.from === 'system' || !data.from) ? data.to : data.from;
       if (activeContact && incomingContact === activeContact) {
-        renderChatThread(activeContact);
+        renderChatThread(activeContact, true);
       }
-      
+
       updateStats();
       renderFeed();
-      
+
       // Trigger subtle pulse on brand logo or header to indicate incoming payload
       pulseHeader();
-      
+
     } catch (e) {
       console.error('Error parsing SSE event data:', e);
     }
@@ -321,7 +344,7 @@ function pulseHeader() {
 function getFilteredMessages() {
   const query = searchInput.value.toLowerCase().trim();
   const filterType = typeFilter.value;
-  
+
   // 1. First, apply filter & search
   let filtered = messagesList.filter(msg => {
     // Filter by Message Type
@@ -334,7 +357,7 @@ function getFilteredMessages() {
         return false;
       }
     }
-    
+
     // Filter by Search Query
     if (query) {
       const contactNumber = (msg.from === 'system' || !msg.from) ? msg.to : msg.from;
@@ -343,7 +366,7 @@ function getFilteredMessages() {
       const matchId = msg.id && msg.id.toLowerCase().includes(query);
       return matchNumber || matchBody || matchId;
     }
-    
+
     return true;
   });
 
@@ -378,25 +401,25 @@ function getFilteredMessages() {
 
 function renderFeed() {
   const { items: filtered, totalBeforeLimit } = getFilteredMessages();
-  
+
   // Remove old items + any "older messages" indicator
   const existing = feedContainer.querySelectorAll('.feed-item, .feed-older-indicator');
   existing.forEach(el => el.remove());
-  
+
   if (filtered.length === 0) {
     feedEmpty.classList.remove('hidden');
     return;
   }
-  
+
   feedEmpty.classList.add('hidden');
-  
+
   filtered.forEach(msg => {
     const item = document.createElement('div');
     const isOutbound = msg.direction === 'outbound' || msg.from === 'system';
     item.className = `feed-item type-${msg.type || 'other'}${isOutbound ? ' outbound' : ''}`;
-    
+
     const contactNumber = (msg.from === 'system' || !msg.from) ? msg.to : msg.from;
-    
+
     // Highlight active selection
     if (groupByNumber) {
       const selectedMsg = messagesList.find(m => m.id === selectedMessageId);
@@ -411,11 +434,11 @@ function renderFeed() {
         item.classList.add('active');
       }
     }
-    
+
     const dirIcon = isOutbound ? 'arrow-up-right' : 'arrow-down-right';
     const displaySender = (isOutbound && !groupByNumber) ? `You to +${contactNumber}` : (contactNumber ? `+${contactNumber}` : 'Unknown');
     const previewLabel = msg.body || (msg.type === 'image' ? 'Image' : msg.type === 'audio' ? 'Audio' : 'Media');
-    
+
     const senderLabel = isOutbound ? 'You' : (contactNumber ? `+${contactNumber}` : 'Unknown');
     item.innerHTML = `
       <div class="feed-avatar ${isOutbound ? 'dir-out' : 'dir-in'}">
@@ -434,14 +457,14 @@ function renderFeed() {
         </div>
       </div>
     `;
-    
+
     item.addEventListener('click', () => {
       selectMessage(msg.id);
     });
-    
+
     feedContainer.appendChild(item);
   });
-  
+
   // Show "X older messages" indicator if items were truncated in ungrouped mode
   if (!groupByNumber && totalBeforeLimit > filtered.length) {
     const older = document.createElement('div');
@@ -449,7 +472,7 @@ function renderFeed() {
     older.textContent = `+ ${totalBeforeLimit - filtered.length} older messages`;
     feedContainer.appendChild(older);
   }
-  
+
   // Reinitialize icons in injected components
   lucide.createIcons();
 }
@@ -476,45 +499,45 @@ function timeAgo(timestampMs) {
    ========================================================================== */
 function selectMessage(msgId) {
   selectedMessageId = msgId;
-  
+
   // Highlight active item in feed list
   const items = feedContainer.querySelectorAll('.feed-item');
   items.forEach(el => el.classList.remove('active'));
-  
+
   // Find standard data record
   const msg = messagesList.find(m => m.id === msgId);
   if (!msg) return;
-  
+
   // Re-render feed to apply active classes
   renderFeed();
-  
+
   // Display detail panel
   detailEmpty.classList.add('hidden');
   detailContent.classList.remove('hidden');
-  
+
   // 1. Populate Tab 1: Chat View
   const contactNumber = (msg.from === 'system' || !msg.from) ? msg.to : msg.from;
   detailSenderChat.textContent = contactNumber ? `+${contactNumber}` : 'Unknown Contact';
   renderChatThread(contactNumber);
   updateReplyLock(contactNumber);
-  
+
   // 2. Populate Tab 2: Original Debug View
   detailTypeBadge.textContent = msg.type ? msg.type.toUpperCase() : 'OTHER';
   detailTypeBadge.className = `detail-type-badge badge-${msg.type || 'other'}`;
-  
+
   const fullDate = new Date(msg.timestamp * 1000);
   detailTime.textContent = fullDate.toLocaleString();
-  
+
   detailSender.textContent = msg.from ? `+${msg.from}` : 'Unknown Sender';
   detailMsgId.textContent = msg.id || 'N/A';
   detailBodyText.innerHTML = msg.body ? escapeHtml(msg.body).replace(/\n/g, '<br>') : '<em class="text-muted">No text content or caption.</em>';
-  
+
   // Media handling
   if (msg.tempMediaUrl) {
     detailMediaSection.classList.remove('hidden');
     detailTempUrl.value = msg.tempMediaUrl;
     detailDownloadLink.href = msg.tempMediaUrl;
-    
+
     // Image visual preview
     if (msg.type === 'image') {
       detailImagePreviewBox.classList.remove('hidden');
@@ -523,7 +546,7 @@ function selectMessage(msgId) {
       detailImagePreviewBox.classList.add('hidden');
       detailImagePreview.src = '';
     }
-    
+
     // Start temporary link countdown (10 minutes = 600 seconds)
     startCountdown(msg.timestamp);
   } else {
@@ -532,10 +555,10 @@ function selectMessage(msgId) {
     detailImagePreview.src = '';
     stopCountdown();
   }
-  
+
   // Render syntax-highlighted raw JSON
   detailJsonCode.innerHTML = syntaxHighlightJson(msg);
-  
+
   // Refresh detail icons
   lucide.createIcons();
 }
@@ -548,13 +571,13 @@ function resetDetailPanel() {
 
 function startCountdown(msgTimestampSeconds) {
   stopCountdown();
-  
+
   const expiryTimeSeconds = msgTimestampSeconds + 600; // 10 minutes limit
-  
+
   function updateTimer() {
     const currentSeconds = Math.floor(Date.now() / 1000);
     const remainingSeconds = expiryTimeSeconds - currentSeconds;
-    
+
     if (remainingSeconds <= 0) {
       countdownTimer.textContent = 'Expired';
       countdownBadge.className = 'countdown-badge expired';
@@ -567,10 +590,10 @@ function startCountdown(msgTimestampSeconds) {
       clearInterval(countdownInterval);
       return;
     }
-    
+
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
-    
+
     countdownTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     countdownBadge.className = 'countdown-badge';
     detailDownloadLink.classList.remove('btn-secondary');
@@ -580,7 +603,7 @@ function startCountdown(msgTimestampSeconds) {
     detailDownloadLink.innerHTML = '<i data-lucide="external-link"></i> Open';
     lucide.createIcons();
   }
-  
+
   updateTimer(); // Tick immediately
   countdownInterval = setInterval(updateTimer, 1000);
 }
@@ -595,22 +618,22 @@ function stopCountdown() {
 /* ==========================================================================
    CHAT THREAD RENDERING
    ========================================================================== */
-function renderChatThread(contactNumber) {
+function renderChatThread(contactNumber, forceScrollToBottom = false) {
   if (!contactNumber) return;
-  
+
   // Filter messages for this contact (either sent by them or sent to them)
   const filtered = messagesList.filter(msg => {
     const isFrom = msg.from === contactNumber;
     const isTo = msg.to === contactNumber;
     return isFrom || isTo;
   });
-  
+
   // Sort chronologically (oldest at the top, newest at the bottom)
   const thread = [...filtered].sort((a, b) => a.timestamp - b.timestamp);
-  
+
   // Clear chat thread container
   chatMessagesContainer.innerHTML = '';
-  
+
   if (thread.length === 0) {
     chatMessagesContainer.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.8rem;">
@@ -619,13 +642,13 @@ function renderChatThread(contactNumber) {
     `;
     return;
   }
-  
+
   thread.forEach(msg => {
     const bubble = document.createElement('div');
     const isOutbound = msg.direction === 'outbound' || msg.from === 'system';
     bubble.className = `chat-bubble ${isOutbound ? 'bubble-outgoing' : 'bubble-incoming'}`;
     bubble.dataset.msgId = msg.id;
-    
+
     // Bubble inner contents
     let mediaContent = '';
     if (msg.type === 'image' && msg.tempMediaUrl) {
@@ -639,16 +662,16 @@ function renderChatThread(contactNumber) {
         <audio src="${msg.tempMediaUrl}" controls style="max-width: 100%; margin-top: 4px; filter: invert(0.9); height: 32px;"></audio>
       `;
     }
-    
+
     const timeFormatted = formatTime(msg.timestamp * 1000);
-    
+
     // Outbound shows blue double checks, inbound shows nothing
-    const checkmarks = isOutbound 
-      ? '<i data-lucide="check-check" style="color: #4fc3f7; width: 14px; height: 14px; margin-left: 2px;"></i>' 
+    const checkmarks = isOutbound
+      ? '<i data-lucide="check-check" style="color: #4fc3f7; width: 14px; height: 14px; margin-left: 2px;"></i>'
       : '';
-      
+
     const bodyEscaped = msg.body ? escapeHtml(msg.body).replace(/\n/g, '<br>') : '';
-    
+
     bubble.innerHTML = `
       ${mediaContent}
       ${bodyEscaped ? `<div class="bubble-text">${bodyEscaped}</div>` : ''}
@@ -657,20 +680,26 @@ function renderChatThread(contactNumber) {
         ${checkmarks}
       </div>
     `;
-    
+
     chatMessagesContainer.appendChild(bubble);
   });
-  
-  // Scroll to the selected message bubble and highlight it
-  if (selectedMessageId) {
+
+  // Scroll handling: scroll to highlighted message, or to bottom
+  let scrolled = false;
+  if (selectedMessageId && !forceScrollToBottom) {
     const targetBubble = chatMessagesContainer.querySelector(`[data-msg-id="${selectedMessageId}"]`);
     if (targetBubble) {
       targetBubble.scrollIntoView({ block: 'center', behavior: 'smooth' });
       targetBubble.classList.add('bubble-highlight');
       setTimeout(() => targetBubble.classList.remove('bubble-highlight'), 2000);
+      scrolled = true;
     }
   }
-  
+
+  if (!scrolled || forceScrollToBottom) {
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+  }
+
   // Render Lucide Icons inside bubbles
   lucide.createIcons();
 }
@@ -682,12 +711,12 @@ function setupEventListeners() {
   // Logout / Lock
   document.getElementById('btn-logout').addEventListener('click', () => {
     sessionStorage.removeItem('wa_token');
-    window.location.href = '/login.html';
+    window.location.href = '/admin/login.html';
   });
 
   // Clear Logs
   btnClear.addEventListener('click', clearLogs);
-  
+
   // Search & Filter
   searchInput.addEventListener('input', renderFeed);
   typeFilter.addEventListener('change', renderFeed);
@@ -695,13 +724,15 @@ function setupEventListeners() {
   // Maintenance Toggle
   maintenanceCheckbox.addEventListener('change', () => {
     saveMaintenanceToggle(maintenanceCheckbox.checked);
+    updateAiActiveIndicator();
   });
-  
+
   // Image Only Toggle
   imageOnlyCheckbox.addEventListener('change', () => {
     saveImageOnlyToggle(imageOnlyCheckbox.checked);
+    updateAiActiveIndicator();
   });
-  
+
   // Group by Number Toggle
   btnToggleGroup.addEventListener('click', () => {
     groupByNumber = !groupByNumber;
@@ -720,20 +751,20 @@ function setupEventListeners() {
     }
     renderFeed();
   });
-  
+
   // Tabs Switcher
   tabBtnChat.addEventListener('click', () => switchTab('chat'));
   tabBtnDebug.addEventListener('click', () => switchTab('debug'));
-  
+
   // Chat Reply Form
   chatReplyForm.addEventListener('submit', sendReply);
-  
+
   // Debug Post Modal Triggers
   btnDebugPost.addEventListener('click', openOutgoingDebugModal);
   btnCloseOutgoingModal.addEventListener('click', closeOutgoingDebugModal);
   btnCloseOutgoingModalOverlay.addEventListener('click', closeOutgoingDebugModal);
   btnCloseOutgoingModalFooter.addEventListener('click', closeOutgoingDebugModal);
-  
+
   // Copy Outgoing API Payload JSON
   btnCopyOutgoingJson.addEventListener('click', () => {
     const text = outgoingJsonCode.textContent;
@@ -747,14 +778,52 @@ function setupEventListeners() {
       copyToClipboard(msg.id, btnCopyId);
     }
   });
-  
+
   btnCopyJson.addEventListener('click', () => {
     const msg = messagesList.find(m => m.id === selectedMessageId);
     if (msg) {
       copyToClipboard(JSON.stringify(msg, null, 2), btnCopyJson);
     }
   });
-  
+
+  // Left Panel Tabs
+  const tabBtnPayloads = document.getElementById('tab-btn-payloads');
+  const tabBtnLogs = document.getElementById('tab-btn-logs');
+  const paneLeftPayloads = document.getElementById('pane-left-payloads');
+  const paneLeftLogs = document.getElementById('pane-left-logs');
+
+  if (tabBtnPayloads && tabBtnLogs) {
+    tabBtnPayloads.addEventListener('click', () => {
+      tabBtnPayloads.classList.add('active');
+      tabBtnLogs.classList.remove('active');
+      paneLeftPayloads.style.display = 'flex';
+      paneLeftLogs.style.display = 'none';
+    });
+
+    tabBtnLogs.addEventListener('click', () => {
+      tabBtnLogs.classList.add('active');
+      tabBtnPayloads.classList.remove('active');
+      paneLeftPayloads.style.display = 'none';
+      paneLeftLogs.style.display = 'flex';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+  }
+
+  // Clear System Logs button
+  const btnClearSysLogs = document.getElementById('btn-clear-sys-logs');
+  if (btnClearSysLogs) {
+    btnClearSysLogs.addEventListener('click', async () => {
+      if (!confirm('Apakah Anda yakin ingin menghapus semua riwayat log aktivitas bot?')) return;
+      try {
+        const res = await fetch('/api/system-logs', { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to clear system logs');
+        systemLogsList = [];
+        renderSystemLogs();
+      } catch (err) {
+        console.error('Error clearing system logs:', err);
+      }
+    });
+  }
 }
 
 // Tab switcher handler
@@ -832,14 +901,14 @@ async function sendReply(event) {
   if (replyLocked) return;
   const text = chatReplyInput.value.trim();
   if (!text || !selectedMessageId) return;
-  
+
   // Get active contact number from the selected message
   const msg = messagesList.find(m => m.id === selectedMessageId);
   if (!msg) return;
   const contactNumber = (msg.from === 'system' || !msg.from) ? msg.to : msg.from;
-  
+
   chatReplyInput.value = '';
-  
+
   try {
     const res = await fetch('/api/messages/send', {
       method: 'POST',
@@ -860,11 +929,11 @@ async function sendReply(event) {
 // Open outgoing post payload debugger modal
 function openOutgoingDebugModal() {
   const replyText = chatReplyInput.value.trim() || "Type a reply message in the input field first to inspect outgoing payload...";
-  
+
   // Retrieve sender number
   const msg = messagesList.find(m => m.id === selectedMessageId);
   const targetContact = msg ? ((msg.from === 'system' || !msg.from) ? msg.to : msg.from) : "6289643180966";
-  
+
   const outgoingPayload = {
     messaging_product: "whatsapp",
     to: targetContact,
@@ -873,7 +942,7 @@ function openOutgoingDebugModal() {
       body: replyText
     }
   };
-  
+
   outgoingJsonCode.innerHTML = syntaxHighlightJson(outgoingPayload);
   outgoingDebugModal.classList.add('open');
   lucide.createIcons();
@@ -893,12 +962,12 @@ function escapeHtml(text) {
 async function copyToClipboard(text, triggerButton) {
   try {
     await navigator.clipboard.writeText(text);
-    
+
     // Visual indicator
     const originalHTML = triggerButton.innerHTML;
     triggerButton.innerHTML = '<i data-lucide="check" style="color: #4ade80;"></i>';
     lucide.createIcons();
-    
+
     setTimeout(() => {
       triggerButton.innerHTML = originalHTML;
       lucide.createIcons();
@@ -912,7 +981,7 @@ async function copyToClipboard(text, triggerButton) {
 function syntaxHighlightJson(jsonObj) {
   let json = JSON.stringify(jsonObj, null, 2);
   json = escapeHtml(json);
-  
+
   return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
     let cls = 'json-number';
     if (/^"/.test(match)) {
@@ -936,40 +1005,147 @@ function syntaxHighlightJson(jsonObj) {
 // ============================================================
 (async function initLandingBtn() {
   try {
-    const res = await fetch('/api/config/landing');
-    const data = await res.json();
-    if (data.url) {
-      const btn = document.getElementById('btn-landing');
-      if (btn) {
-        btn.href = data.url;
-        btn.style.display = 'flex';
-      }
+    const btn = document.getElementById('btn-landing');
+    if (btn) {
+      btn.href = '/';
+      btn.style.display = 'flex';
     }
   } catch (e) {
     // silently ignore — button stays hidden
   }
 })();
 
+function updateAiActiveIndicator() {
+  const indicator = document.getElementById('ai-active-indicator');
+  if (!indicator) return;
+
+  const isMaintenance = maintenanceCheckbox && maintenanceCheckbox.checked;
+  const isImageOnly = imageOnlyCheckbox && imageOnlyCheckbox.checked;
+
+  if (isMaintenance) {
+    indicator.textContent = '--- Mode Maintenance aktif, AI akan membalas sedang maintenance ---';
+    indicator.style.color = '#f59e0b';
+    indicator.style.display = 'inline-flex';
+  } else {
+    if (isImageOnly) {
+      indicator.textContent = '--- Mode AI diaktifkan (Hanya Gambar), AI akan gambar secara otomatis ---';
+    } else {
+      indicator.textContent = '--- Mode AI diaktifkan, AI akan membalas pesan secara otomatis ---';
+    }
+    indicator.style.color = '#10b981';
+    indicator.style.display = 'inline-flex';
+  }
+}
+
+// ============================================================
+// Bot Activity Logs
+// ============================================================
+async function fetchSystemLogs() {
+  try {
+    const res = await fetch('/api/system-logs');
+    if (!res.ok) throw new Error('Failed to fetch system logs');
+    systemLogsList = await res.json();
+    renderSystemLogs();
+  } catch (error) {
+    console.error('Error fetching system logs:', error);
+  }
+}
+
+function renderSystemLogs() {
+  const container = document.getElementById('sys-logs-container');
+  const emptyState = document.getElementById('sys-logs-empty');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (systemLogsList.length === 0) {
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      container.appendChild(emptyState);
+    } else {
+      container.appendChild(createLogsEmptyState());
+    }
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  systemLogsList.forEach(log => {
+    const logEl = document.createElement('div');
+    logEl.className = `log-item log-level-${log.level}`;
+    logEl.style.padding = '8px 10px';
+    logEl.style.borderRadius = '6px';
+    logEl.style.marginBottom = '6px';
+    logEl.style.lineHeight = '1.4';
+    logEl.style.wordBreak = 'break-all';
+
+    let bg = 'rgba(255,255,255,0.02)';
+    let color = 'var(--text-primary)';
+    let border = '1px solid var(--border-color)';
+    let prefix = 'info';
+
+    if (log.level === 'error') {
+      bg = 'rgba(239,68,68,0.06)';
+      color = '#ef4444';
+      border = '1px solid rgba(239,68,68,0.2)';
+      prefix = 'error';
+    } else if (log.level === 'warn') {
+      bg = 'rgba(245,158,11,0.06)';
+      color = '#f59e0b';
+      border = '1px solid rgba(245,158,11,0.2)';
+      prefix = 'warn';
+    } else if (log.level === 'info') {
+      color = '#10b981';
+      bg = 'rgba(16,185,129,0.04)';
+      border = '1px solid rgba(16,185,129,0.15)';
+      prefix = 'info';
+    }
+
+    logEl.style.background = bg;
+    logEl.style.color = color;
+    logEl.style.border = border;
+
+    const timeStr = new Date(log.timestamp).toLocaleTimeString();
+    logEl.innerHTML = `<span style="color:var(--text-muted);margin-right:8px;">[${timeStr}]</span> <strong style="text-transform: uppercase; font-size: 0.65rem; border: 1px solid currentColor; padding: 1px 4px; border-radius: 4px; margin-right: 6px;">${prefix}</strong> ${escapeHtml(log.message)}`;
+    container.appendChild(logEl);
+  });
+}
+
+function createLogsEmptyState() {
+  const div = document.createElement('div');
+  div.id = 'sys-logs-empty';
+  div.style.color = 'var(--text-muted)';
+  div.style.textAlign = 'center';
+  div.style.marginTop = '40px';
+  div.innerHTML = `
+    <i data-lucide="terminal" style="width:24px;height:24px;margin-bottom:8px;color:var(--text-muted);"></i>
+    <p>Belum ada aktivitas bot yang tercatat.</p>
+  `;
+  return div;
+}
+
 // ============================================================
 // AI Config Modal
 // ============================================================
 (function initAIConfigModal() {
-  const modal        = document.getElementById('ai-config-modal');
-  const btnOpen      = document.getElementById('btn-ai-config');
-  const btnClose     = document.getElementById('btn-close-ai-config');
-  const btnCancel    = document.getElementById('btn-ai-config-cancel');
-  const btnSave      = document.getElementById('btn-ai-config-save');
-  const overlay      = document.getElementById('ai-config-modal-overlay');
-  const saveStatus   = document.getElementById('cfg-save-status');
+  const modal = document.getElementById('ai-config-modal');
+  const btnOpen = document.getElementById('btn-ai-config');
+  const btnClose = document.getElementById('btn-close-ai-config');
+  const btnCancel = document.getElementById('btn-ai-config-cancel');
+  const btnSave = document.getElementById('btn-ai-config-save');
+  const overlay = document.getElementById('ai-config-modal-overlay');
+  const saveStatus = document.getElementById('cfg-save-status');
 
-  const inputModel   = document.getElementById('cfg-model');
-  const inputGemKey  = document.getElementById('cfg-gemini-key');
-  const inputOrKey   = document.getElementById('cfg-or-key');
-  const inputPrompt  = document.getElementById('cfg-system-prompt');
-  const hintModel    = document.getElementById('cfg-model-hint');
-  const charsEl      = document.getElementById('cfg-chars');
-  const tabGemini    = document.getElementById('cfg-tab-gemini');
-  const tabOR        = document.getElementById('cfg-tab-openrouter');
+  const groupGemini = document.getElementById('cfg-group-gemini');
+  const groupOR = document.getElementById('cfg-group-openrouter');
+  const inputGemModel = document.getElementById('cfg-gemini-model');
+  const inputOrModel = document.getElementById('cfg-or-model');
+  const inputGemKey = document.getElementById('cfg-gemini-key');
+  const inputOrKey = document.getElementById('cfg-or-key');
+  const inputPrompt = document.getElementById('cfg-system-prompt');
+  const charsEl = document.getElementById('cfg-chars');
+  const tabGemini = document.getElementById('cfg-tab-gemini');
+  const tabOR = document.getElementById('cfg-tab-openrouter');
 
   if (!modal || !btnOpen) return;
 
@@ -981,15 +1157,17 @@ function syntaxHighlightJson(jsonObj) {
     tabGemini.classList.toggle('active', prov === 'gemini');
     tabOR.classList.toggle('active', prov === 'openrouter');
     if (prov === 'gemini') {
-      hintModel.textContent = 'Gemini model ID — e.g. gemini-2.0-flash-lite';
+      groupGemini.style.display = 'block';
+      groupOR.style.display = 'none';
     } else {
-      hintModel.textContent = 'OpenRouter model slug — e.g. meta-llama/llama-3-8b-instruct';
+      groupGemini.style.display = 'none';
+      groupOR.style.display = 'block';
     }
     lucide.createIcons();
   }
 
   tabGemini.addEventListener('click', () => setProvider('gemini'));
-  tabOR.addEventListener('click',     () => setProvider('openrouter'));
+  tabOR.addEventListener('click', () => setProvider('openrouter'));
 
   // Char counter
   inputPrompt.addEventListener('input', () => {
@@ -1000,14 +1178,15 @@ function syntaxHighlightJson(jsonObj) {
   async function openModal() {
     modal.classList.add('open');
     try {
-      const res  = await fetch('/api/config');
+      const res = await fetch('/api/config');
       const data = await res.json();
       if (data.success) {
         const cfg = data.config;
         setProvider(cfg.provider || 'gemini');
-        inputModel.value  = cfg.model  || '';
+        inputGemModel.value = cfg.geminiModel || '';
+        inputOrModel.value = cfg.openrouterModel || '';
         inputGemKey.value = cfg.geminiKey || '';
-        inputOrKey.value  = cfg.openrouterKey || '';
+        inputOrKey.value = cfg.openrouterKey || '';
         inputPrompt.value = cfg.systemPrompt || '';
         charsEl.textContent = inputPrompt.value.length + ' chars';
       }
@@ -1038,11 +1217,12 @@ function syntaxHighlightJson(jsonObj) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          provider:      currentProvider,
-          model:         inputModel.value.trim(),
-          geminiKey:     inputGemKey.value.trim(),
+          provider: currentProvider,
+          geminiModel: inputGemModel.value.trim(),
+          openrouterModel: inputOrModel.value.trim(),
+          geminiKey: inputGemKey.value.trim(),
           openrouterKey: inputOrKey.value.trim(),
-          systemPrompt:  inputPrompt.value,
+          systemPrompt: inputPrompt.value,
         })
       });
       const data = await res.json();

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>AIFood - WhatsApp AI Analisis Makanan Diabetes</title>
+    <meta name="description"
+        content="Kirim foto makanan Anda melalui WhatsApp dan dapatkan analisis kalori, karbohidrat, serta rekomendasi glikemik secara instan. Dirancang untuk penderita diabetes." />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#256656",
+                        "primary-container": "#40806e",
+                        "on-primary": "#ffffff",
+                        "background": "#f8faf7",
+                        "surface": "#f8faf7",
+                        "on-surface": "#191c1b",
+                        "on-surface-variant": "#3f4945",
+                        "outline": "#707975",
+                        "outline-variant": "#bfc9c4",
+                        "primary-fixed": "#aef0da",
+                        "on-primary-fixed": "#002019",
+                        "surface-container": "#eceeec",
+                        "surface-container-low": "#f2f4f1",
+                        "surface-container-highest": "#e1e3e0",
+                    },
+                    fontFamily: { manrope: ["Manrope", "sans-serif"] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+
+        #whatsapp-btn {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        #whatsapp-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(37, 102, 86, 0.35);
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .phone-mockup {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .gear-icon:hover .material-symbols-outlined {
+            animation: spin 1.2s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- ========================================================
+         CONFIG — change these two values to customise the page
+         ======================================================== -->
+    <!-- Konfigurasi dimuat dinamis dari backend API -->
+
+    <!-- Navbar -->
+    <nav class="w-full sticky top-0 z-50 bg-surface shadow-sm shadow-[0px_4px_20px_rgba(77,140,122,0.08)]">
+        <div class="max-w-7xl mx-auto px-6 md:px-10 h-16 flex justify-between items-center">
+            <a href="#" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <span class="material-symbols-outlined text-primary text-3xl">robot_2</span>
+                <span class="font-bold text-xl text-primary">AIFood</span>
+            </a>
+            <div class="hidden md:flex gap-8 items-center font-medium">
+                <a href="#" class="text-primary border-b-2 border-primary pb-1">Beranda</a>
+            </div>
+            <div class="flex items-center">
+                <a id="gear-link" href="#" target="_blank" rel="noopener noreferrer"
+                    class="gear-icon p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-all"
+                    title="Admin / Settings">
+                    <span class="material-symbols-outlined">settings</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero -->
+        <section class="px-6 md:px-10 py-12 md:py-24 max-w-7xl mx-auto relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-primary-fixed/20 to-transparent md:rounded-3xl -z-10">
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="flex flex-col gap-6 text-center lg:text-left items-center lg:items-start">
+                    <div
+                        class="inline-flex items-center gap-2 bg-primary-fixed/30 text-primary px-4 py-2 rounded-full w-fit">
+                        <span class="material-symbols-outlined text-sm">verified</span>
+                        <span class="text-xs font-bold uppercase tracking-wider">AI Food Analysis</span>
+                    </div>
+                    <h1
+                        class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-on-background leading-tight">
+                        WhatsApp AI untuk Analisis Makanan Diabetes
+                    </h1>
+                    <p class="text-base sm:text-lg text-on-surface-variant max-w-xl">
+                        Kirim foto makanan Anda melalui WhatsApp dan dapatkan analisis kalori, karbohidrat, serta
+                        rekomendasi glikemik secara instan. Dirancang untuk penderita diabetes.
+                    </p>
+                    <div
+                        class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-4 w-full sm:w-auto">
+                        <a id="whatsapp-btn" href="#" target="_blank" rel="noopener noreferrer"
+                            class="bg-primary text-on-primary px-8 py-4 rounded-full flex items-center gap-2 font-bold w-full sm:w-auto justify-center">
+                            <span>Coba Chat Sekarang</span>
+                            <span class="material-symbols-outlined">arrow_forward</span>
+                        </a>
+                    </div>
+                    <div
+                        class="flex flex-wrap items-center justify-center lg:justify-start gap-6 mt-8 border-t border-outline-variant pt-6 w-full">
+                        <div class="flex items-center gap-2 text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary">lock</span>
+                            <span class="text-sm font-medium">Data Aman</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-on-surface-variant">
+                            <span class="material-symbols-outlined text-primary">speed</span>
+                            <span class="text-sm font-medium">Respon Instan</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative flex justify-center items-center">
+                    <div class="absolute inset-0 bg-primary-container/10 rounded-full blur-3xl transform scale-75">
+                    </div>
+                    <!-- Phone Mockup -->
+                    <div
+                        class="phone-mockup relative w-[280px] h-[560px] bg-white rounded-[2.5rem] border-[8px] border-surface-container-highest shadow-2xl overflow-hidden flex flex-col z-10">
+                        <div class="bg-[#075E54] text-white px-4 py-3 flex items-center gap-3">
+                            <span class="material-symbols-outlined text-sm">arrow_back</span>
+                            <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                                <span class="material-symbols-outlined text-[#075E54]">robot_2</span>
+                            </div>
+                            <div>
+                                <div class="font-bold text-xs">AIFood Bot</div>
+                                <div class="text-[8px] text-white/80">Online</div>
+                            </div>
+                        </div>
+                        <div class="flex-1 bg-[#E5DDD5] p-4 flex flex-col gap-3 overflow-y-auto">
+                            <div class="self-end bg-[#DCF8C6] rounded-lg p-2 max-w-[85%] shadow-sm">
+                                <div class="rounded w-full h-24 mb-1 overflow-hidden">
+                                    <img src="images/food-mockup.png" alt="Food mockup"
+                                        class="w-full h-full object-cover">
+                                </div>
+                                <div class="text-[8px] text-right text-gray-500">10:42 AM</div>
+                            </div>
+                            <div class="self-start bg-white rounded-lg p-3 max-w-[85%] shadow-sm">
+                                <div class="text-[10px] font-bold text-primary mb-1 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">restaurant_menu</span>
+                                    Analisis Makanan
+                                </div>
+                                <div class="text-[9px] text-gray-800 leading-relaxed">
+                                    <strong>Nasi Goreng Ayam</strong><br />
+                                    • Karbohidrat: 45g<br />
+                                    • Gula: 5g<br />
+                                    • Kalori: 550 kcal<br />
+                                    <div
+                                        class="mt-1 bg-primary-fixed/30 p-1 rounded border-l-2 border-primary text-[8px]">
+                                        <strong class="text-primary">Status:</strong> Hati-hati, porsi karbohidrat cukup
+                                        tinggi.
+                                    </div>
+                                </div>
+                                <div class="text-[8px] text-right text-gray-400 mt-1">10:43 AM</div>
+                            </div>
+                        </div>
+                        <div class="bg-[#F0F0F0] p-2 flex items-center gap-2">
+                            <div class="flex-1 bg-white rounded-full px-3 py-1 text-[10px] text-gray-400">Ketik pesan...
+                            </div>
+                            <div class="bg-[#00897B] rounded-full p-1.5 text-white flex items-center justify-center">
+                                <span class="material-symbols-outlined text-sm">send</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="bg-surface-container-low py-16 md:py-24 px-6 md:px-10">
+            <div class="max-w-7xl mx-auto text-center">
+                <h2 class="text-3xl font-bold mb-10 md:mb-16 text-primary">Cara Kerja Sederhana</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div
+                        class="bg-surface p-8 rounded-3xl shadow-sm border border-outline-variant hover:shadow-md transition-all">
+                        <div
+                            class="w-16 h-16 bg-primary-fixed text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span class="material-symbols-outlined text-2xl">photo_camera</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">1. Kirim Foto</h3>
+                        <p class="text-on-surface-variant">Ambil foto makanan Anda dan kirimkan langsung ke WhatsApp
+                            AIFood.</p>
+                    </div>
+                    <div
+                        class="bg-surface p-8 rounded-3xl shadow-sm border border-outline-variant hover:shadow-md transition-all">
+                        <div
+                            class="w-16 h-16 bg-primary-fixed text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span class="material-symbols-outlined text-2xl">memory</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">2. AI Menganalisis</h3>
+                        <p class="text-on-surface-variant">AI kami mengidentifikasi nutrisi dan kalori dalam hitungan
+                            detik.</p>
+                    </div>
+                    <div
+                        class="bg-surface p-8 rounded-3xl shadow-sm border border-outline-variant hover:shadow-md transition-all">
+                        <div
+                            class="w-16 h-16 bg-primary-fixed text-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span class="material-symbols-outlined text-2xl">fact_check</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">3. Dapatkan Saran</h3>
+                        <p class="text-on-surface-variant">Terima rekomendasi instan untuk membantu menjaga gula darah
+                            Anda.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-surface-container-highest py-12 px-6 md:px-10 border-t border-outline-variant">
+        <div
+            class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
+            <div>
+                <span class="font-bold text-2xl text-primary">AIFood</span>
+                <p class="text-sm text-on-surface-variant mt-2">© 2026 AIFood Healthcare System.</p>
+            </div>
+            <div class="flex flex-wrap justify-center gap-6 sm:gap-8 text-sm font-medium text-on-surface-variant">
+                <a href="#" class="hover:text-primary transition-colors">Privacy Policy</a>
+                <a href="#" class="hover:text-primary transition-colors">Terms of Service</a>
+                <a id="footer-admin-link" href="#" target="_blank" rel="noopener noreferrer"
+                    class="hover:text-primary transition-colors font-bold">Admin Dashboard</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Apply config dynamically from backend -->
+    <script>
+        async function loadConfig() {
+            let phoneNumber = "6281809181193";
+            let backendLink = "/admin";
+            try {
+                const res = await fetch("/api/landing-config");
+                const data = await res.json();
+                if (data.phoneNumber) phoneNumber = data.phoneNumber;
+                if (data.backendLink) backendLink = data.backendLink;
+            } catch (err) {
+                console.error("Gagal memuat konfigurasi landing page:", err);
+            }
+            document.getElementById("whatsapp-btn").href = "https://wa.me/" + phoneNumber;
+            document.getElementById("gear-link").href = backendLink;
+            document.getElementById("footer-admin-link").href = backendLink;
+        }
+        loadConfig();
+    </script>
+</body>
+
+</html>
