@@ -557,7 +557,11 @@ function selectMessage(msgId) {
   }
 
   // Render syntax-highlighted raw JSON
-  detailJsonCode.innerHTML = syntaxHighlightJson(msg);
+  detailJsonCode.innerHTML = syntaxHighlightJson(msg.rawData || msg);
+  const detailResponseCode = document.getElementById('detail-response-code');
+  if (detailResponseCode) {
+    detailResponseCode.innerHTML = syntaxHighlightJson(msg.metaResponse || msg);
+  }
 
   // Refresh detail icons
   lucide.createIcons();
@@ -782,9 +786,19 @@ function setupEventListeners() {
   btnCopyJson.addEventListener('click', () => {
     const msg = messagesList.find(m => m.id === selectedMessageId);
     if (msg) {
-      copyToClipboard(JSON.stringify(msg, null, 2), btnCopyJson);
+      copyToClipboard(JSON.stringify(msg.rawData || msg, null, 2), btnCopyJson);
     }
   });
+
+  const btnCopyResponseJson = document.getElementById('btn-copy-response-json');
+  if (btnCopyResponseJson) {
+    btnCopyResponseJson.addEventListener('click', () => {
+      const msg = messagesList.find(m => m.id === selectedMessageId);
+      if (msg) {
+        copyToClipboard(JSON.stringify(msg.metaResponse || msg, null, 2), btnCopyResponseJson);
+      }
+    });
+  }
 
   // Left Panel Tabs
   const tabBtnPayloads = document.getElementById('tab-btn-payloads');
@@ -1079,25 +1093,25 @@ function renderSystemLogs() {
     logEl.style.lineHeight = '1.4';
     logEl.style.wordBreak = 'break-all';
 
-    let bg = 'rgba(255,255,255,0.02)';
+    let bg = 'var(--bg-secondary)';
     let color = 'var(--text-primary)';
     let border = '1px solid var(--border-color)';
     let prefix = 'info';
 
     if (log.level === 'error') {
-      bg = 'rgba(239,68,68,0.06)';
-      color = '#ef4444';
-      border = '1px solid rgba(239,68,68,0.2)';
+      bg = 'var(--status-disconnected-bg)';
+      color = 'var(--status-disconnected-text)';
+      border = '1px solid var(--status-disconnected-bg)';
       prefix = 'error';
     } else if (log.level === 'warn') {
-      bg = 'rgba(245,158,11,0.06)';
-      color = '#f59e0b';
-      border = '1px solid rgba(245,158,11,0.2)';
+      bg = 'rgba(217, 119, 6, 0.08)';
+      color = 'var(--color-audio-msg)';
+      border = '1px solid rgba(217, 119, 6, 0.15)';
       prefix = 'warn';
     } else if (log.level === 'info') {
-      color = '#10b981';
-      bg = 'rgba(16,185,129,0.04)';
-      border = '1px solid rgba(16,185,129,0.15)';
+      bg = 'var(--status-connected-bg)';
+      color = 'var(--status-connected-text)';
+      border = '1px solid var(--status-connected-bg)';
       prefix = 'info';
     }
 
@@ -1106,7 +1120,7 @@ function renderSystemLogs() {
     logEl.style.border = border;
 
     const timeStr = new Date(log.timestamp).toLocaleTimeString();
-    logEl.innerHTML = `<span style="color:var(--text-muted);margin-right:8px;">[${timeStr}]</span> <strong style="text-transform: uppercase; font-size: 0.65rem; border: 1px solid currentColor; padding: 1px 4px; border-radius: 4px; margin-right: 6px;">${prefix}</strong> ${escapeHtml(log.message)}`;
+    logEl.innerHTML = `<span style="color:var(--text-muted);margin-right:8px;">[${timeStr}]</span> <strong style="text-transform: uppercase; font-size: 0.65rem; border: 1px solid currentColor; padding: 1px 4px; border-radius: 4px; margin-right: 6px;">${prefix}</strong> <span style="color:var(--text-primary);">${escapeHtml(log.message)}</span>`;
     container.appendChild(logEl);
   });
 }
@@ -1242,4 +1256,39 @@ function createLogsEmptyState() {
       console.error('[AI Config Modal] Save failed:', err);
     }
   });
+})();
+
+// Theme Toggle Logic
+(function() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeIcon = document.getElementById('theme-icon');
+
+  function applyTheme() {
+    const theme = localStorage.getItem('theme') || 'light';
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      if (themeIcon) {
+        themeIcon.setAttribute('data-lucide', 'sun');
+      }
+    } else {
+      document.documentElement.classList.remove('dark');
+      if (themeIcon) {
+        themeIcon.setAttribute('data-lucide', 'moon');
+      }
+    }
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'light' : 'dark');
+      applyTheme();
+    });
+  }
+
+  // Initial apply
+  applyTheme();
 })();

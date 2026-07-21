@@ -168,7 +168,15 @@ async function sendWhatsAppReply(to, body) {
     body: body,
     timestamp: Math.floor(Date.now() / 1000),
     direction: 'outbound',
-    metaResponse: metaApiResponse
+    metaResponse: metaApiResponse,
+    rawData: {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: {
+        body
+      }
+    }
   };
   const savedRecord = await saveMessage(outboundRecord);
   broadcast(savedRecord);
@@ -640,7 +648,15 @@ app.post('/api/messages/send', async (req, res) => {
       body: body,
       timestamp: Math.floor(Date.now() / 1000),
       direction: 'outbound',
-      metaResponse: metaApiResponse
+      metaResponse: metaApiResponse,
+      rawData: {
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'text',
+        text: {
+          body: body
+        }
+      }
     };
 
     const savedRecord = await saveMessage(outboundPayload);

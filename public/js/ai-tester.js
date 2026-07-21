@@ -606,3 +606,38 @@ function copyText(text, btn) {
     setTimeout(() => { btn.innerHTML = orig; lucide.createIcons(); }, 2000);
   });
 }
+
+// Theme Toggle Logic
+(function() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeIcon = document.getElementById('theme-icon');
+
+  function applyTheme() {
+    const theme = localStorage.getItem('theme') || 'light';
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      if (themeIcon) {
+        themeIcon.setAttribute('data-lucide', 'sun');
+      }
+    } else {
+      document.documentElement.classList.remove('dark');
+      if (themeIcon) {
+        themeIcon.setAttribute('data-lucide', 'moon');
+      }
+    }
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'light' : 'dark');
+      applyTheme();
+    });
+  }
+
+  // Initial apply
+  applyTheme();
+})();

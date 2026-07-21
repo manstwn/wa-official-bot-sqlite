@@ -17,7 +17,7 @@
 .login-bg-glow-1 {
   width: 600px;
   height: 600px;
-  background: rgba(34, 197, 94, 0.25);
+  background: rgba(37, 102, 86, 0.25);
   top: -200px;
   left: -200px;
 }
@@ -25,7 +25,7 @@
 .login-bg-glow-2 {
   width: 500px;
   height: 500px;
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(64, 128, 110, 0.15);
   bottom: -150px;
   right: -150px;
   animation-delay: -3s;
@@ -34,7 +34,7 @@
 .login-bg-glow-3 {
   width: 400px;
   height: 400px;
-  background: rgba(34, 197, 94, 0.1);
+  background: rgba(37, 102, 86, 0.1);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -71,8 +71,8 @@
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.05));
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: linear-gradient(135deg, rgba(37, 102, 86, 0.15), rgba(37, 102, 86, 0.05));
+  border: 1px solid rgba(37, 102, 86, 0.2);
   color: var(--color-brand);
 }
 
@@ -83,7 +83,7 @@
 }
 
 .login-brand-name {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-header);
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -91,16 +91,14 @@
 }
 
 .login-card {
-  background: rgba(18, 26, 47, 0.7);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
   border-radius: 24px;
   padding: 40px 36px 36px;
   width: 100%;
   max-width: 380px;
   text-align: center;
-  box-shadow: 0 0 80px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 40px rgba(37, 102, 86, 0.08);
 }
 
 .login-greeting {
@@ -113,7 +111,7 @@
 }
 
 .login-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 1.05rem;
   font-weight: 400;
   color: var(--text-secondary);
@@ -137,11 +135,11 @@
   width: 100%;
   padding: 16px 20px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-color);
+  background: #ffffff;
   color: var(--text-primary);
   font-size: 1.2rem;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: 0.2em;
   outline: none;
   transition: border-color 0.3s, box-shadow 0.3s;
@@ -149,8 +147,8 @@
 }
 
 .login-input:focus {
-  border-color: rgba(34, 197, 94, 0.4);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.08), 0 0 30px rgba(34, 197, 94, 0.05);
+  border-color: rgba(37, 102, 86, 0.4);
+  box-shadow: 0 0 0 4px rgba(37, 102, 86, 0.08), 0 0 30px rgba(37, 102, 86, 0.05);
 }
 
 .login-input::placeholder {
@@ -202,10 +200,46 @@
   color: white;
   font-size: 0.95rem;
   font-weight: 600;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
   transition: filter 0.25s, transform 0.15s, box-shadow 0.25s;
   box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+}
+
+.login-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.login-back-btn:hover {
+  background: rgba(37, 102, 86, 0.05);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.login-back-btn svg,
+.login-back-btn i {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s;
+}
+
+.login-back-btn:hover svg,
+.login-back-btn:hover i {
+  transform: translateX(-3px);
 }
 
 .login-btn:hover {

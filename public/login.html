@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login � Meta WA Gateway</title>
+  <title>Login – DiabetAI Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/login.css">
+  <script>
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
 </head>
 <body>
   <div class="login-bg">
@@ -20,9 +25,9 @@
   <div class="login-container">
     <div class="login-brand">
       <div class="login-brand-icon">
-        <i data-lucide="message-square-code"></i>
+        <i data-lucide="bot"></i>
       </div>
-      <span class="login-brand-name">Meta WA Gateway</span>
+      <span class="login-brand-name">DiabetAI Portal</span>
     </div>
 
     <div class="login-card">
@@ -39,6 +44,10 @@
           <span class="login-btn-text">Unlock Dashboard</span>
           <i data-lucide="arrow-right"></i>
         </button>
+        <a href="/" class="login-back-btn" style="text-decoration:none;">
+          <i data-lucide="arrow-left"></i>
+          <span>Back to Landing Page</span>
+        </a>
       </form>
 
       <p class="login-footer-text">Secured with PIN authentication</p>

@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>AIFood - WhatsApp AI Analisis Makanan Diabetes</title>
+    <title>DiabetAI - WhatsApp AI Analisis Makanan Diabetes</title>
     <meta name="description"
         content="Kirim foto makanan Anda melalui WhatsApp dan dapatkan analisis kalori, karbohidrat, serta rekomendasi glikemik secara instan. Dirancang untuk penderita diabetes." />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -95,7 +95,7 @@
         <div class="max-w-7xl mx-auto px-6 md:px-10 h-16 flex justify-between items-center">
             <a href="#" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <span class="material-symbols-outlined text-primary text-3xl">robot_2</span>
-                <span class="font-bold text-xl text-primary">AIFood</span>
+                <span class="font-bold text-xl text-primary">DiabetAI</span>
             </a>
             <div class="hidden md:flex gap-8 items-center font-medium">
                 <a href="#" class="text-primary border-b-2 border-primary pb-1">Beranda</a>
@@ -163,14 +163,14 @@
                                 <span class="material-symbols-outlined text-[#075E54]">robot_2</span>
                             </div>
                             <div>
-                                <div class="font-bold text-xs">AIFood Bot</div>
+                                <div class="font-bold text-xs">DiabetAI Bot</div>
                                 <div class="text-[8px] text-white/80">Online</div>
                             </div>
                         </div>
                         <div class="flex-1 bg-[#E5DDD5] p-4 flex flex-col gap-3 overflow-y-auto">
                             <div class="self-end bg-[#DCF8C6] rounded-lg p-2 max-w-[85%] shadow-sm">
                                 <div class="rounded w-full h-24 mb-1 overflow-hidden">
-                                    <img src="images/food-mockup.png" alt="Food mockup"
+                                    <img src="images/new-food-mockup.jpg" alt="Food mockup"
                                         class="w-full h-full object-cover">
                                 </div>
                                 <div class="text-[8px] text-right text-gray-500">10:42 AM</div>
@@ -180,16 +180,16 @@
                                     <span class="material-symbols-outlined text-[12px]">restaurant_menu</span>
                                     Analisis Makanan
                                 </div>
-                                <div class="text-[9px] text-gray-800 leading-relaxed">
-                                    <strong>Nasi Goreng Ayam</strong><br />
-                                    • Karbohidrat: 45g<br />
-                                    • Gula: 5g<br />
-                                    • Kalori: 550 kcal<br />
-                                    <div
-                                        class="mt-1 bg-primary-fixed/30 p-1 rounded border-l-2 border-primary text-[8px]">
-                                        <strong class="text-primary">Status:</strong> Hati-hati, porsi karbohidrat cukup
-                                        tinggi.
-                                    </div>
+                                <div class="text-[8.5px] text-gray-800 leading-normal space-y-1">
+                                    <p><strong>Nama Makanan:</strong><br />Pisang</p>
+                                    <p><strong>Estimasi Gizi (perkiraan 100g):</strong><br />
+                                    1. Indeks Glikemik (IG): Sedang (Estimasi: 51)<br />
+                                    2. Karbohidrat: 34 g<br />
+                                    3. Kalori: 134 kcal</p>
+                                    <p><strong>Status untuk Diabetes:</strong><br />
+                                    Masih dapat dikonsumsi dalam porsi sedang karena memiliki indeks glikemik sedang dan mengandung karbohidrat yang perlu diperhatikan.</p>
+                                    <p><strong>Saran:</strong><br />
+                                    Konsumsi bersama sumber protein atau lemak sehat agar kenaikan gula darah lebih stabil.</p>
                                 </div>
                                 <div class="text-[8px] text-right text-gray-400 mt-1">10:43 AM</div>
                             </div>
@@ -219,7 +219,7 @@
                         </div>
                         <h3 class="text-xl font-bold mb-3">1. Kirim Foto</h3>
                         <p class="text-on-surface-variant">Ambil foto makanan Anda dan kirimkan langsung ke WhatsApp
-                            AIFood.</p>
+                            DiabetAI.</p>
                     </div>
                     <div
                         class="bg-surface p-8 rounded-3xl shadow-sm border border-outline-variant hover:shadow-md transition-all">
@@ -251,14 +251,14 @@
         <div
             class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
             <div>
-                <span class="font-bold text-2xl text-primary">AIFood</span>
-                <p class="text-sm text-on-surface-variant mt-2">© 2026 AIFood Healthcare System.</p>
+                <span class="font-bold text-2xl text-primary">DiabetAI</span>
+                <p class="text-sm text-on-surface-variant mt-2">© 2026 DiabetAI Healthcare System.</p>
             </div>
             <div class="flex flex-wrap justify-center gap-6 sm:gap-8 text-sm font-medium text-on-surface-variant">
                 <a href="#" class="hover:text-primary transition-colors">Privacy Policy</a>
                 <a href="#" class="hover:text-primary transition-colors">Terms of Service</a>
                 <a id="footer-admin-link" href="#" target="_blank" rel="noopener noreferrer"
-                    class="hover:text-primary transition-colors font-bold">Admin Dashboard</a>
+                    class="hidden hover:text-primary transition-colors font-bold">Admin Dashboard</a>
             </div>
         </div>
     </footer>

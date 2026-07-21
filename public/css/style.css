@@ -2,6 +2,71 @@
    DESIGN SYSTEM & VARIABLES
    ========================================================================== */
 :root {
+  /* Light Theme (Default, matching landing page) */
+  --bg-primary: #f8faf7;
+  --bg-secondary: #f2f4f1;
+  --bg-panel: #ffffff;
+  --bg-panel-hover: #eceeec;
+  --border-color: #bfc9c4;
+  --border-glow: rgba(37, 102, 86, 0.15);
+  
+  /* Accent Colors */
+  --text-primary: #191c1b;
+  --text-secondary: #3f4945;
+  --text-muted: #707975;
+  
+  --color-brand: #256656; /* WhatsApp Green */
+  --color-brand-glow: rgba(37, 102, 86, 0.2);
+  
+  --color-text-msg: #256656; /* Primary */
+  --color-image-msg: #8b5cf6; /* Violet */
+  --color-audio-msg: #d97706; /* Amber */
+  --color-other-msg: #db2777; /* Pink */
+  
+  --color-danger: #ba1a1a;
+  --color-danger-glow: rgba(186, 26, 26, 0.15);
+  
+  /* Fonts */
+  --font-header: 'Manrope', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  
+  /* Transitions */
+  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --feed-active-bg: rgba(37, 102, 86, 0.08);
+  --status-connected-bg: rgba(37, 102, 86, 0.1);
+  --status-connected-text: #256656;
+  --status-disconnected-bg: rgba(186, 26, 26, 0.1);
+  --status-disconnected-text: #ba1a1a;
+  --chat-msg-container-bg: #efeae2;
+  --chat-msg-container-pattern: rgba(37, 102, 86, 0.08);
+  --chat-bubble-incoming-bg: #ffffff;
+  --chat-bubble-incoming-text: #111b21;
+  --chat-bubble-outgoing-bg: #d9fdd3;
+  --chat-bubble-outgoing-text: #111b21;
+  --chat-bubble-meta-outgoing: rgba(0, 0, 0, 0.45);
+  --chat-input-bg: #ffffff;
+  --glow-opacity: 0.04;
+  --panel-shadow: 0 4px 20px rgba(77, 140, 122, 0.08);
+
+  --color-openrouter-active: #2563eb;
+
+  --inbound-msg-color: #2563eb;
+  --inbound-msg-bg: rgba(37, 99, 235, 0.08);
+  --inbound-msg-border: rgba(37, 99, 235, 0.12);
+
+  --code-block-bg: #f2f4f1;
+  --code-block-border: #bfc9c4;
+  --code-block-text: #191c1b;
+  --json-key: #9d174d;
+  --json-value: #166534;
+  --json-number: #c2410c;
+  --json-boolean: #1e40af;
+  --json-null: #707975;
+}
+
+:root.dark {
+  /* Dark Theme */
   --bg-primary: #080c14;
   --bg-secondary: #0e1424;
   --bg-panel: rgba(18, 26, 47, 0.6);
@@ -24,13 +89,37 @@
   
   --color-danger: #ef4444;
   --color-danger-glow: rgba(239, 68, 68, 0.15);
-  
-  /* Fonts */
-  --font-header: 'Space Grotesk', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  
-  /* Transitions */
-  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --feed-active-bg: rgba(59, 130, 246, 0.06);
+  --status-connected-bg: rgba(34, 197, 94, 0.12);
+  --status-connected-text: #4ade80;
+  --status-disconnected-bg: rgba(239, 68, 68, 0.1);
+  --status-disconnected-text: #f87171;
+  --chat-msg-container-bg: #080c14;
+  --chat-msg-container-pattern: rgba(255, 255, 255, 0.07);
+  --chat-bubble-incoming-bg: rgba(26, 37, 65, 0.7);
+  --chat-bubble-incoming-text: #f3f4f6;
+  --chat-bubble-outgoing-bg: #005c4b;
+  --chat-bubble-outgoing-text: #e9edef;
+  --chat-bubble-meta-outgoing: rgba(255, 255, 255, 0.6);
+  --chat-input-bg: rgba(0, 0, 0, 0.25);
+  --glow-opacity: 0.05;
+  --panel-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+
+  --color-openrouter-active: #60a5fa;
+
+  --inbound-msg-color: #60a5fa;
+  --inbound-msg-bg: rgba(59, 130, 246, 0.08);
+  --inbound-msg-border: rgba(59, 130, 246, 0.12);
+
+  --code-block-bg: #111b21;
+  --code-block-border: rgba(255, 255, 255, 0.15);
+  --code-block-text: #cbd5e1;
+  --json-key: #f472b6;
+  --json-value: #34d399;
+  --json-number: #fbbf24;
+  --json-boolean: #60a5fa;
+  --json-null: #9ca3af;
 }
 
 /* ==========================================================================
@@ -45,9 +134,9 @@
 body {
   background-color: var(--bg-primary);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.04) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(37, 102, 86, var(--glow-opacity)) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(37, 102, 86, var(--glow-opacity)) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(37, 102, 86, var(--glow-opacity)) 0px, transparent 50%);
   color: var(--text-primary);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -152,25 +241,25 @@ body {
 }
 
 .status-badge.connected {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.2);
+  background: var(--status-connected-bg);
+  color: var(--status-connected-text);
+  border-color: var(--status-connected-bg);
 }
 
 .status-badge.connected .status-dot {
-  background-color: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
+  background-color: var(--status-connected-text);
+  box-shadow: 0 0 8px var(--status-connected-text);
   animation: pulse-dot 2s infinite;
 }
 
 .status-badge.disconnected {
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.15);
+  background: var(--status-disconnected-bg);
+  color: var(--status-disconnected-text);
+  border-color: var(--status-disconnected-bg);
 }
 
 .status-badge.disconnected .status-dot {
-  background-color: var(--color-danger);
+  background-color: var(--status-disconnected-text);
 }
 
 .status-dot {
@@ -403,7 +492,7 @@ body {
 
 .filter-bar input[type="text"] {
   flex: 1;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--chat-input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 6px 12px;
@@ -415,12 +504,12 @@ body {
 }
 
 .filter-bar input[type="text"]:focus {
-  border-color: rgba(59, 130, 246, 0.4);
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.1);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 8px var(--border-glow);
 }
 
 .filter-bar select {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--chat-input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 6px 10px;
@@ -483,11 +572,11 @@ body {
 }
 
 .feed-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(37, 102, 86, 0.04);
 }
 
 .feed-item.active {
-  background: rgba(59, 130, 246, 0.06);
+  background: var(--feed-active-bg);
 }
 
 .feed-item.type-image.active {
@@ -510,12 +599,12 @@ body {
   height: 20px;
   padding: 3px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(37, 102, 86, 0.05);
   border: 1px solid var(--border-color);
 }
 
-.feed-avatar.dir-out i { color: var(--color-brand); background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.12); }
-.feed-avatar.dir-in i { color: #60a5fa; background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.12); }
+.feed-avatar.dir-out i { color: var(--color-brand); background: var(--status-connected-bg); border-color: var(--border-color); }
+.feed-avatar.dir-in i { color: var(--inbound-msg-color); background: var(--inbound-msg-bg); border-color: var(--inbound-msg-border); }
 
 /* Content column */
 .feed-content {
@@ -585,16 +674,16 @@ body {
 }
 
 .feed-item:not(.outbound) .feed-sender-label {
-  color: #60a5fa;
+  color: var(--inbound-msg-color);
 }
 
 .feed-item.outbound {
-  background: rgba(34, 197, 94, 0.02);
+  background: rgba(37, 102, 86, 0.02);
   border-left-color: var(--color-brand);
 }
 
 .feed-item.outbound.active {
-  background: rgba(34, 197, 94, 0.06);
+  background: rgba(37, 102, 86, 0.06);
 }
 
 .feed-item.outbound .feed-contact {
@@ -657,7 +746,7 @@ body {
   justify-content: center;
   width: 64px;
   height: 64px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(37, 102, 86, 0.04);
   border: 1px solid var(--border-color);
   border-radius: 50%;
   margin-bottom: 16px;
@@ -784,7 +873,7 @@ body {
 /* Message Content Box */
 .body-content-card {
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(37, 102, 86, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   font-size: 0.9rem;
@@ -797,7 +886,7 @@ body {
   justify-content: center;
   align-items: center;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(37, 102, 86, 0.05);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   max-height: 320px;
@@ -836,7 +925,7 @@ body {
   gap: 6px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #34d399;
+  color: var(--status-connected-text);
 }
 
 .shield-icon {
@@ -849,9 +938,9 @@ body {
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: var(--status-disconnected-bg);
+  border: 1px solid var(--status-disconnected-bg);
+  color: var(--status-disconnected-text);
   font-size: 0.72rem;
   font-weight: 700;
   border-radius: 6px;
@@ -881,7 +970,7 @@ body {
 
 .url-input-group input {
   flex: 1;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(37, 102, 86, 0.05);
   border: 1px solid var(--border-color);
   padding: 8px 12px;
   border-radius: 8px;
@@ -899,8 +988,8 @@ body {
 }
 
 .json-code-block {
-  background: #040811;
-  border: 1px solid var(--border-color);
+  background: var(--code-block-bg);
+  border: 1px solid var(--code-block-border);
   border-radius: 12px;
   padding: 16px;
   overflow: auto;
@@ -911,15 +1000,15 @@ body {
   font-family: 'Fira Code', 'Courier New', Courier, monospace;
   font-size: 0.75rem;
   line-height: 1.5;
-  color: #cbd5e1;
+  color: var(--code-block-text);
 }
 
 /* Syntaxy JSON Highlighting */
-.json-key { color: #f472b6; }     /* Pink */
-.json-value { color: #34d399; }   /* Mint */
-.json-number { color: #fbbf24; }  /* Amber */
-.json-boolean { color: #60a5fa; } /* Blue */
-.json-null { color: #9ca3af; }    /* Grey */
+.json-key { color: var(--json-key); }
+.json-value { color: var(--json-value); }
+.json-number { color: var(--json-number); }
+.json-boolean { color: var(--json-boolean); }
+.json-null { color: var(--json-null); }
 
 /* ==========================================================================
    MODAL DIALOG
@@ -944,7 +1033,7 @@ body {
 .modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(4, 6, 10, 0.8);
+  background: rgba(25, 28, 27, 0.5);
   backdrop-filter: blur(8px);
 }
 
@@ -1019,7 +1108,7 @@ body {
   align-items: center;
   gap: 16px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(37, 102, 86, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   cursor: pointer;
@@ -1027,8 +1116,8 @@ body {
 }
 
 .mock-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(37, 102, 86, 0.05);
+  border-color: rgba(37, 102, 86, 0.12);
   transform: translateY(-1px);
 }
 
@@ -1210,7 +1299,7 @@ body {
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(37, 102, 86, 0.05);
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
   border-radius: 50%;
@@ -1247,9 +1336,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background-color: #080c14;
+  background-color: var(--chat-msg-container-bg);
   background-image: 
-    radial-gradient(var(--border-color) 0.8px, transparent 0.8px);
+    radial-gradient(var(--chat-msg-container-pattern) 0.8px, transparent 0.8px);
   background-size: 16px 16px;
 }
 
@@ -1280,17 +1369,18 @@ body {
 
 .bubble-incoming {
   align-self: flex-start;
-  background: var(--bg-panel-hover);
+  background: var(--chat-bubble-incoming-bg);
   border-top-left-radius: 2px;
   border: 1px solid var(--border-color);
+  color: var(--chat-bubble-incoming-text);
 }
 
 .bubble-outgoing {
   align-self: flex-end;
-  background: #005c4b;
-  color: #e9edef;
+  background: var(--chat-bubble-outgoing-bg);
+  color: var(--chat-bubble-outgoing-text);
   border-top-right-radius: 2px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
 .bubble-image-preview {
@@ -1321,7 +1411,7 @@ body {
 }
 
 .bubble-outgoing .bubble-meta {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--chat-bubble-meta-outgoing);
 }
 
 /* Chat Input Footer Area */
@@ -1393,7 +1483,7 @@ body {
 
 .chat-form input[type="text"] {
   width: 100%;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--chat-input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px 14px;
@@ -1405,7 +1495,7 @@ body {
 }
 
 .chat-form input[type="text"]:focus {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: var(--color-brand);
 }
 
 .chat-footer.locked input[type="text"] {
@@ -1484,7 +1574,7 @@ body {
    AI CONFIG MODAL
    ========================================================================== */
 .ai-cfg-section {
-  background: rgba(255,255,255,0.02);
+  background: rgba(37, 102, 86, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 16px 18px 18px;
@@ -1523,7 +1613,7 @@ body {
 
 .ai-cfg-input {
   width: 100%;
-  background: rgba(0,0,0,0.25);
+  background: var(--chat-input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary);
@@ -1535,9 +1625,9 @@ body {
   resize: vertical;
 }
 .ai-cfg-input:focus {
-  border-color: rgba(34,197,94,0.3);
-  background: rgba(34,197,94,0.04);
-  box-shadow: 0 0 0 3px rgba(34,197,94,0.06);
+  border-color: rgba(37,102,86,0.3);
+  background: rgba(37,102,86,0.02);
+  box-shadow: 0 0 0 3px rgba(37,102,86,0.06);
 }
 .ai-cfg-input::placeholder { color: var(--text-muted); }
 textarea.ai-cfg-input { min-height: 80px; line-height: 1.55; font-size: 0.78rem; }
@@ -1564,8 +1654,8 @@ textarea.ai-cfg-input { min-height: 80px; line-height: 1.55; font-size: 0.78rem;
 }
 .ai-cfg-tab svg { width: 14px; height: 14px; }
 .ai-cfg-tab[data-prov="gemini"].active     { background: rgba(34,197,94,0.1);  border-color: rgba(34,197,94,0.3);  color: var(--color-brand); }
-.ai-cfg-tab[data-prov="openrouter"].active { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: #60a5fa; }
-.ai-cfg-tab:hover:not(.active) { color: var(--text-secondary); background: rgba(255,255,255,0.04); }
+.ai-cfg-tab[data-prov="openrouter"].active { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: var(--color-openrouter-active); }
+.ai-cfg-tab:hover:not(.active) { color: var(--text-secondary); background: rgba(37, 102, 86, 0.05); }
 
 .ai-cfg-save-status {
   margin-left: 8px;
