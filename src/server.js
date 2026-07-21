@@ -9,9 +9,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, '..');
-import { 
-  saveMessage, 
-  readMessages, 
+import {
+  saveMessage,
+  readMessages,
   clearMessages,
   readAIConfig,
   writeAIConfig,
@@ -19,6 +19,7 @@ import {
   writeAIHistory,
   deleteAIHistoryEntry,
   getChatHistory,
+  checkIsNewContact,
   writeSystemLog,
   readSystemLogs,
   clearSystemLogs
@@ -261,14 +262,14 @@ async function callAIWithHistory(history, userMessage, aiConfig) {
 
   if (provider === 'gemini') {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    
+
     // Map history to Gemini contents format
     // Inbound = user, Outbound (system/outbound) = model
     const contents = history.map(msg => ({
       role: msg.direction === 'inbound' ? 'user' : 'model',
       parts: [{ text: msg.body }]
     }));
-    
+
     // Append current user message
     contents.push({
       role: 'user',
@@ -286,18 +287,18 @@ async function callAIWithHistory(history, userMessage, aiConfig) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geminiBody)
     });
-    
+
     const geminiData = await geminiRes.json();
     if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Gemini API error');
     responseText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
   } else if (provider === 'openrouter') {
     const apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    
+
     const messages = [];
     if (aiConfig.systemPrompt) {
       messages.push({ role: 'system', content: aiConfig.systemPrompt });
     }
-    
+
     // Map history to OpenRouter messages format
     // Inbound = user, Outbound (system/outbound) = assistant
     history.forEach(msg => {
@@ -306,7 +307,7 @@ async function callAIWithHistory(history, userMessage, aiConfig) {
         content: msg.body
       });
     });
-    
+
     // Append current user message
     messages.push({
       role: 'user',
@@ -360,30 +361,7 @@ app.post('/api/auto-ai/toggle', async (req, res) => {
   }
 });
 
-// ============================================================
-// Toggle API: Auto AI Image Only mode
-// ============================================================
-app.get('/api/auto-ai/image-only', async (req, res) => {
-  try {
-    const cfg = await readAIConfig();
-    return res.json({ success: true, imageOnly: !!cfg.imageOnly });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/auto-ai/image-only', async (req, res) => {
-  try {
-    const { imageOnly } = req.body;
-    const cfg = await readAIConfig();
-    cfg.imageOnly = !!imageOnly;
-    await writeAIConfig(cfg);
-    console.log(`[Auto AI] Image Only diatur ke ${cfg.imageOnly ? 'NYALA' : 'MATI'}`);
-    return res.json({ success: true, imageOnly: cfg.imageOnly });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
+// Image Only mode is now permanently enabled — text messages are not processed.
 
 app.post(WEBHOOK_PATH, async (req, res) => {
   try {
@@ -422,68 +400,77 @@ app.post(WEBHOOK_PATH, async (req, res) => {
       receivedAt: savedRecord.ingestedAt
     });
 
-    // AI processing (async)
-    if (payload.type === 'image' || payload.type === 'text') {
-      (async () => {
-        try {
-          const cfg = await readAIConfig();
-          const fromNumber = payload.from;
+    // Pemrosesan latar belakang — semua logika balasan
+    (async () => {
+      try {
+        if (!payload.from) return;
 
-          if (!cfg.autoAiEnabled) {
-            await logSystemActivity('warn', `Auto AI: Mode Pemeliharaan aktif. Mengirim pesan pemberitahuan pemeliharaan ke +${fromNumber}.`);
-            await sendWhatsAppReply(fromNumber, 'Maaf, asisten AI kami saat ini sedang dalam pemeliharaan (maintenance) untuk peningkatan sistem. Silakan hubungi kami kembali beberapa saat lagi.');
-            return;
-          }
+        const fromNumber = payload.from;
+        const cfg = await readAIConfig();
 
-          if (payload.type === 'text') {
-            if (cfg.imageOnly) {
-              await logSystemActivity('warn', `Auto AI: Mode Image-Only aktif. Mengabaikan pesan teks dari +${fromNumber}.`);
-              return;
-            }
-
-            await logSystemActivity('info', `Auto AI: Memproses pesan teks dari +${fromNumber} dengan ${cfg.provider}...`);
-            // Fetch history context (last 9 text messages)
-            const history = await getChatHistory(fromNumber, 9);
-            try {
-              const aiReply = await callAIWithHistory(history, payload.body, cfg);
-              await sendWhatsAppReply(fromNumber, aiReply);
-            } catch (aiErr) {
-              await logSystemActivity('error', `Auto AI: Error AI untuk +${fromNumber}: ${aiErr.message}`);
-              await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses pesan Anda.');
-            }
-          }
-
-          if (payload.type === 'image') {
-            // 1s delay then send template message
-            await new Promise(r => setTimeout(r, 1000));
-            await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
-
-            if (localPath) {
-              const fullPath = path.join(rootDir, 'public', localPath);
-              const imageBuffer = await fs.promises.readFile(fullPath);
-              const base64 = imageBuffer.toString('base64');
-              const ext = path.extname(localPath).toLowerCase();
-              const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
-              const mimeType = mimeMap[ext] || 'image/jpeg';
-
-              await logSystemActivity('info', `Auto AI: Memproses gambar dari +${fromNumber} dengan ${cfg.provider}...`);
-              try {
-                const aiReply = await callAIWithImage(base64, mimeType, cfg);
-                await sendWhatsAppReply(fromNumber, aiReply);
-              } catch (aiErr) {
-                await logSystemActivity('error', `Auto AI: Error AI untuk +${fromNumber}: ${aiErr.message}`);
-                await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
-              }
-            } else {
-              await logSystemActivity('error', `Auto AI: Gagal memproses gambar dari +${fromNumber} karena media tidak terunduh.`);
-              await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
-            }
-          }
-        } catch (err) {
-          await logSystemActivity('error', `Auto AI: Error latar belakang: ${err.message}`);
+        // ── 1. Cek Mode Pemeliharaan ────────────────────────────
+        if (!cfg.autoAiEnabled) {
+          await logSystemActivity('warn', `Auto AI: Mode Pemeliharaan aktif. Mengirim notifikasi ke +${fromNumber}.`);
+          await sendWhatsAppReply(fromNumber, 'Maaf, asisten AI kami saat ini sedang dalam pemeliharaan (maintenance) untuk peningkatan sistem. Silakan hubungi kami kembali beberapa saat lagi.');
+          return;
         }
-      })();
-    }
+
+        // ── 2. Cek Kontak Baru (berlaku untuk SEMUA tipe pesan) ─
+        const isNewContact = await checkIsNewContact(fromNumber);
+        if (isNewContact) {
+          await logSystemActivity('info', `Auto AI: Kontak baru terdeteksi (+${fromNumber}). Mengirim pesan sambutan/disclaimer.`);
+          await sendWhatsAppReply(
+            fromNumber,
+            'Halo! Selamat datang di layanan analisis kami 👋\n\n' +
+            '⚠️ *Disclaimer* Hasil analisis yang diberikan oleh sistem ini hanyalah saran dari AI dan *bukan merupakan saran medis profesional*. ' +
+            'Selalu konsultasikan kondisi kesehatan Anda dengan tenaga medis yang berkualifikasi.'
+          );
+          // Tidak return — lanjut ke validasi tipe & proses AI
+        }
+
+        // ── 3. Validasi Tipe Pesan — hanya gambar yang diproses ─
+        if (payload.type !== 'image') {
+          await logSystemActivity('warn', `Webhook: Tipe pesan tidak valid (${payload.type || 'unknown'}) dari +${fromNumber}. Mengirim instruksi balik.`);
+          await sendWhatsAppReply(
+            fromNumber,
+            'Mohon maaf, sistem kami saat ini hanya dapat memproses pesan dalam format *gambar* 🖼️\n\n' +
+            'Pesan dalam bentuk teks, audio, video, dokumen, maupun format lainnya tidak dapat kami terima.\n\n' +
+            '_Terima kasih atas pengertian Anda._'
+          );
+          return;
+        }
+
+        // ── 4. Proses Gambar dengan AI ──────────────────────────
+        await new Promise(r => setTimeout(r, 1000));
+        await sendWhatsAppReply(fromNumber, 'Mohon tunggu, memproses gambar..');
+
+        if (localPath) {
+          const fullPath = path.join(rootDir, 'public', localPath);
+          const imageBuffer = await fs.promises.readFile(fullPath);
+          const base64 = imageBuffer.toString('base64');
+          const ext = path.extname(localPath).toLowerCase();
+          const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+          const mimeType = mimeMap[ext] || 'image/jpeg';
+
+          await logSystemActivity('info', `Auto AI: Memproses gambar dari +${fromNumber} dengan ${cfg.provider}...`);
+          try {
+            const aiReply = await callAIWithImage(base64, mimeType, cfg);
+            await sendWhatsAppReply(fromNumber, aiReply);
+          } catch (aiErr) {
+            await logSystemActivity('error', `Auto AI: Error AI untuk +${fromNumber}: ${aiErr.message}`);
+            await sendWhatsAppReply(fromNumber, 'Maaf, terjadi kesalahan saat memproses gambar.');
+          }
+        } else {
+          await logSystemActivity('error', `Auto AI: Gagal memproses gambar dari +${fromNumber} karena media tidak terunduh.`);
+          await sendWhatsAppReply(fromNumber, 'Maaf, gagal mengunduh gambar.');
+        }
+
+      } catch (err) {
+        await logSystemActivity('error', `Auto AI: Error latar belakang: ${err.message}`);
+      }
+    })();
+
+
   } catch (error) {
     console.error('[Webhook Error] Error processing incoming payload:', error);
     await logSystemActivity('error', `Webhook Error: ${error.message}`);
@@ -732,6 +719,7 @@ app.post('/api/ai-test', async (req, res) => {
     }
 
     let responseText = '';
+    let rawResponse = null;
 
     // ---- GEMINI ----
     if (provider === 'gemini') {
@@ -763,6 +751,7 @@ app.post('/api/ai-test', async (req, res) => {
       });
 
       const geminiData = await geminiRes.json();
+      rawResponse = geminiData;
       if (!geminiRes.ok) {
         console.error('[AI Test] Gemini API error:', geminiData);
         return res.status(geminiRes.status).json({
@@ -817,6 +806,7 @@ app.post('/api/ai-test', async (req, res) => {
       });
 
       const orData = await orRes.json();
+      rawResponse = orData;
       if (!orRes.ok) {
         console.error('[AI Test] OpenRouter API error:', orData);
         return res.status(orRes.status).json({
@@ -841,7 +831,8 @@ app.post('/api/ai-test', async (req, res) => {
       provider,
       model: model || '(default)',
       responseText,
-      elapsedMs: elapsed
+      elapsedMs: elapsed,
+      raw: rawResponse
     });
 
   } catch (err) {
@@ -942,7 +933,7 @@ app.listen(PORT, async () => {
   console.log(` Halaman Utama: http://localhost:${PORT}`);
   console.log(` Dasbor Web:    http://localhost:${PORT}/admin`);
   console.log(` URL Webhook:   http://localhost:${PORT}${WEBHOOK_PATH}`);
-  
+
   if (isCfEnabled && cfUrl) {
     console.log(`--------------------------------------------------`);
     console.log(` [ TEROWONGAN CLOUDFLARE ]`);

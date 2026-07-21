@@ -57,3 +57,5 @@ desktop.ini
 # ========================
 *.tmp
 *.bak
+database.sql
+

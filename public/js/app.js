@@ -67,7 +67,6 @@ const outgoingJsonCode = document.getElementById('outgoing-json-code');
 
 // Maintenance Toggle
 const maintenanceCheckbox = document.getElementById('maintenance-checkbox');
-const imageOnlyCheckbox = document.getElementById('image-only-checkbox');
 
 /* ==========================================================================
    INITIALIZATION & API CALLS
@@ -102,7 +101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 3. Load Maintenance toggle state
   fetchMaintenanceToggle();
-  fetchImageOnlyToggle();
 
   // 4. Bind UI interactions
   setupEventListeners();
@@ -189,39 +187,7 @@ async function saveMaintenanceToggle(active) {
   }
 }
 
-// Fetch Image Only toggle state from server
-async function fetchImageOnlyToggle() {
-  try {
-    const res = await fetch('/api/auto-ai/image-only');
-    if (!res.ok) throw new Error('Failed to fetch toggle');
-    const data = await res.json();
-    if (data.success) {
-      imageOnlyCheckbox.checked = !!data.imageOnly;
-      updateAiActiveIndicator();
-    }
-  } catch (error) {
-    console.error('Error fetching Image Only toggle:', error);
-  }
-}
 
-// Save Image Only toggle state to server
-async function saveImageOnlyToggle(imageOnly) {
-  try {
-    const res = await fetch('/api/auto-ai/image-only', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageOnly })
-    });
-    if (!res.ok) throw new Error('Failed to save toggle');
-    console.log(`[Auto AI] Image Only ${imageOnly ? 'ON' : 'OFF'}`);
-    updateAiActiveIndicator();
-  } catch (error) {
-    console.error('Error saving Image Only toggle:', error);
-    // Revert checkbox on failure
-    imageOnlyCheckbox.checked = !imageOnly;
-    updateAiActiveIndicator();
-  }
-}
 
 /* ==========================================================================
    SSE REAL-TIME STREAMING
@@ -731,11 +697,7 @@ function setupEventListeners() {
     updateAiActiveIndicator();
   });
 
-  // Image Only Toggle
-  imageOnlyCheckbox.addEventListener('change', () => {
-    saveImageOnlyToggle(imageOnlyCheckbox.checked);
-    updateAiActiveIndicator();
-  });
+
 
   // Group by Number Toggle
   btnToggleGroup.addEventListener('click', () => {
@@ -1034,18 +996,13 @@ function updateAiActiveIndicator() {
   if (!indicator) return;
 
   const isMaintenance = maintenanceCheckbox && maintenanceCheckbox.checked;
-  const isImageOnly = imageOnlyCheckbox && imageOnlyCheckbox.checked;
 
   if (isMaintenance) {
     indicator.textContent = '--- Mode Maintenance aktif, AI akan membalas sedang maintenance ---';
     indicator.style.color = '#f59e0b';
     indicator.style.display = 'inline-flex';
   } else {
-    if (isImageOnly) {
-      indicator.textContent = '--- Mode AI diaktifkan (Hanya Gambar), AI akan gambar secara otomatis ---';
-    } else {
-      indicator.textContent = '--- Mode AI diaktifkan, AI akan membalas pesan secara otomatis ---';
-    }
+    indicator.textContent = '--- Mode AI diaktifkan (Hanya Gambar), AI akan memproses gambar secara otomatis ---';
     indicator.style.color = '#10b981';
     indicator.style.display = 'inline-flex';
   }

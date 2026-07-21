@@ -319,7 +319,7 @@ async function runAITest() {
     const data = await res.json();
     lastRawResponse = data;
 
-    const rawJson = JSON.stringify(data, null, 2);
+    const rawJson = data.raw ? JSON.stringify(data.raw, null, 2) : JSON.stringify(data, null, 2);
 
     if (!res.ok || !data.success) {
       showError(

@@ -481,6 +481,24 @@ export async function getChatHistory(phoneNumber, limit = 9) {
 }
 
 /**
+ * Check if a phone number is a new contact (no prior inbound messages of any type).
+ * Uses count <= 1 because the current incoming message is already saved to DB
+ * before this check runs, so count = 1 means "only the current message exists".
+ */
+export async function checkIsNewContact(phoneNumber) {
+  try {
+    const row = db.prepare(`
+      SELECT COUNT(*) as count FROM messages
+      WHERE [from] = ? AND direction = 'inbound'
+    `).get(phoneNumber);
+    return row.count <= 1;
+  } catch (error) {
+    console.error('Error checking new contact in SQLite:', error);
+    return false;
+  }
+}
+
+/**
  * Write a system log entry.
  */
 export async function writeSystemLog(level, message) {
